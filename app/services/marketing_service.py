@@ -22,6 +22,14 @@ class MarketingService:
     def __init__(self) -> None:
         self.ai = AIService()
 
+    @staticmethod
+    def _payload_json(payload: object) -> str:
+        if hasattr(payload, "model_dump_json"):
+            return payload.model_dump_json()  # type: ignore[attr-defined]
+        if hasattr(payload, "json"):
+            return payload.json()  # type: ignore[attr-defined]
+        return str(payload)
+
     def generate_strategy(self, payload: StrategyRequest) -> StrategyResponse:
         fallback = {
             "strategic_positioning": "ZenQi come riferimento locale per percorsi olistici integrati e personalizzati.",
@@ -53,7 +61,7 @@ class MarketingService:
 
         result = self.ai.generate_json(
             "Sei un marketing strategist senior per centri olistici. Rispondi in JSON valido.",
-            f"Genera una strategia per: {payload.json()}",
+            f"Genera una strategia per: {self._payload_json(payload)}",
             fallback,
         )
         return StrategyResponse(**result)
@@ -78,7 +86,7 @@ class MarketingService:
         fallback = {"post_ideas": fallback_posts}
         result = self.ai.generate_json(
             "Sei un social media manager per un centro olistico. Rispondi in JSON valido.",
-            f"Crea idee post social per: {payload.json()}",
+            f"Crea idee post social per: {self._payload_json(payload)}",
             fallback,
         )
         parsed = [PostIdea(**item) for item in result["post_ideas"]]
@@ -112,7 +120,7 @@ class MarketingService:
         }
         result = self.ai.generate_json(
             "Sei un media buyer senior. Rispondi in JSON valido.",
-            f"Genera campagne per: {payload.json()}",
+            f"Genera campagne per: {self._payload_json(payload)}",
             fallback,
         )
         return AdsResponse(campaigns=[CampaignIdea(**item) for item in result["campaigns"]])

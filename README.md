@@ -92,6 +92,25 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 .\.venv\Scripts\Activate.ps1
 ```
 
+Se ricevi esattamente l'errore **"L'esecuzione di script è disabilitata nel sistema in uso"**:
+
+```powershell
+Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned -Force
+.\.venv\Scripts\Activate.ps1
+```
+
+Se non vuoi modificare la policy utente, puoi usare il bypass solo per la sessione corrente:
+
+```powershell
+powershell -ExecutionPolicy Bypass -NoProfile -Command ". .\.venv\Scripts\Activate.ps1; python --version"
+```
+
+Alternativa senza script PowerShell (Prompt dei comandi/CMD):
+
+```cmd
+.venv\Scripts\activate.bat
+```
+
 5. Aggiorna pip e installa dipendenze:
 
 ```powershell
@@ -121,14 +140,30 @@ uvicorn app.main:app --reload
 9. Apri il browser su:
 `http://127.0.0.1:8000/docs`
 
+### 5.b) Avvio rapido Windows con script `.bat` (one-click)
+
+Se preferisci evitare PowerShell e problemi di Execution Policy, puoi usare:
+
+```cmd
+start_windows.bat
+```
+
+Lo script:
+- crea `.venv` se manca,
+- attiva venv con `activate.bat`,
+- aggiorna `pip/setuptools/wheel`,
+- installa dipendenze,
+- crea `.env` da `.env.example` se non esiste,
+- avvia `uvicorn app.main:app --reload`.
+
 ### 6) Se `pip install` fallisce per proxy/rete
 
 Se ricevi errori simili a `Tunnel connection failed: 403 Forbidden`, devi configurare pip con il proxy aziendale o usare una rete senza restrizioni.
 
 ### 7) Errore `pydantic-core` / Rust su Windows
 
-Da questa versione del progetto usiamo `pydantic==1.10.24`, che **non richiede `pydantic-core`**.
-Se vedi ancora errori `pydantic-core` / `maturin` / `PyO3`, stai quasi certamente installando da:
+Con Python 3.14 devi usare **Pydantic v2** (questo progetto richiede `pydantic>=2.12.4,<3`).
+Se vedi errori `pydantic-core` / `maturin` / `PyO3`, stai quasi certamente installando da:
 
 - un vecchio `.venv`,
 - cache pip,
@@ -137,12 +172,13 @@ Se vedi ancora errori `pydantic-core` / `maturin` / `PyO3`, stai quasi certament
 Procedura rapida (PowerShell):
 
 ```powershell
-deactivate
+if (Get-Command deactivate -ErrorAction SilentlyContinue) { deactivate }
 Remove-Item -Recurse -Force .venv
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install --upgrade pip setuptools wheel
 pip cache purge
+pip install --index-url https://pypi.org/simple --upgrade "pydantic>=2.12.4,<3"
 pip install --index-url https://pypi.org/simple -r requirements.txt
 ```
 
@@ -152,7 +188,7 @@ Verifica finale:
 pip show pydantic
 ```
 
-Deve risultare `Version: 1.10.24`.
+Deve risultare una versione `2.x` (consigliato `>=2.12.4`).
 
 ## Avvio rapido
 
