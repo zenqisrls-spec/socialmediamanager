@@ -53,7 +53,7 @@ class MarketingService:
 
         result = self.ai.generate_json(
             "Sei un marketing strategist senior per centri olistici. Rispondi in JSON valido.",
-            f"Genera una strategia per: {payload.model_dump_json()}",
+            f"Genera una strategia per: {payload.json()}",
             fallback,
         )
         return StrategyResponse(**result)
@@ -78,7 +78,7 @@ class MarketingService:
         fallback = {"post_ideas": fallback_posts}
         result = self.ai.generate_json(
             "Sei un social media manager per un centro olistico. Rispondi in JSON valido.",
-            f"Crea idee post social per: {payload.model_dump_json()}",
+            f"Crea idee post social per: {payload.json()}",
             fallback,
         )
         parsed = [PostIdea(**item) for item in result["post_ideas"]]
@@ -112,7 +112,7 @@ class MarketingService:
         }
         result = self.ai.generate_json(
             "Sei un media buyer senior. Rispondi in JSON valido.",
-            f"Genera campagne per: {payload.model_dump_json()}",
+            f"Genera campagne per: {payload.json()}",
             fallback,
         )
         return AdsResponse(campaigns=[CampaignIdea(**item) for item in result["campaigns"]])
