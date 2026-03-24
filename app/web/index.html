@@ -21,8 +21,32 @@
   <body>
     <h1>ZenQi Social Media Manager</h1>
     <p class="hint">Interfaccia web per usare l'API senza riga di comando.</p>
+    <p class="hint" id="runHint"></p>
+
+    <section class="card" style="margin-bottom: 16px;">
+      <h3>Configurazione rapida</h3>
+      <label for="apiBase"><strong>URL API Base</strong></label>
+      <input id="apiBase" style="width:100%; padding:8px; margin-top:6px;" />
+      <p class="hint" style="margin-bottom:0;">
+        Se hai avviato il server in locale usa: <code>http://127.0.0.1:8000</code>
+      </p>
+    </section>
 
     <div class="grid">
+      <section class="card">
+        <h3>Configurazioni (no-code)</h3>
+        <label>OpenAI API Key</label>
+        <input id="cfgApiKey" type="password" style="width:100%; padding:8px; margin-bottom:8px;" />
+        <label>Model Name</label>
+        <input id="cfgModel" value="gpt-4.1-mini" style="width:100%; padding:8px; margin-bottom:8px;" />
+        <label><input id="cfgApproval" type="checkbox" checked /> Richiedi approvazione umana</label><br />
+        <label><input id="cfgAutopublish" type="checkbox" /> Abilita autopubblicazione</label><br />
+        <label><input id="cfgWhatsapp" type="checkbox" /> Abilita WhatsApp (simulato)</label><br /><br />
+        <button onclick="loadConfig()">Carica config</button>
+        <button onclick="saveConfig()">Salva config</button>
+        <pre id="cfgOut"></pre>
+      </section>
+
       <section class="card">
         <h3>Health Check</h3>
         <button onclick="callHealth()">Verifica API</button>
@@ -71,18 +95,90 @@
         <button onclick="callApi('/api/v1/scheduler/build', 'schedulerBody', 'schedulerOut')">Genera calendario</button>
         <pre id="schedulerOut"></pre>
       </section>
+
+      <section class="card">
+        <h3>Workflow pubblicazione (con approvazione)</h3>
+        <textarea id="publishBody">{
+  "channel": "instagram",
+  "content": "Post prova: respiro consapevole 5 minuti al giorno."
+}</textarea>
+        <button onclick="callApi('/api/v1/workflow/publish', 'publishBody', 'publishOut')">Invia al workflow</button>
+        <pre id="publishOut"></pre>
+      </section>
     </div>
 
     <script>
+      function getApiBase() {
+        return document.getElementById("apiBase").value.replace(/\/$/, "");
+      }
+
+      function buildUrl(path) {
+        return `${getApiBase()}${path}`;
+      }
+
+      function showFetchError(out, error, url) {
+        out.textContent = [
+          `Errore: ${error}`,
+          "",
+          "Possibili cause:",
+          `1) Server non avviato su ${getApiBase()}`,
+          "2) Hai aperto il file HTML direttamente (file://) invece di http://127.0.0.1:8000/",
+          "3) URL API base errato",
+          "",
+          `URL chiamato: ${url}`
+        ].join("\n");
+      }
+
       async function callHealth() {
         const health = document.getElementById("health");
         health.textContent = "Controllo in corso...";
         try {
-          const res = await fetch("/health");
+          const url = buildUrl("/health");
+          const res = await fetch(url);
           const data = await res.json();
           health.innerHTML = `<span class="ok">OK:</span> ${JSON.stringify(data)}`;
         } catch (e) {
           health.innerHTML = `<span class="err">Errore:</span> ${e}`;
+        }
+      }
+
+      async function loadConfig() {
+        const out = document.getElementById("cfgOut");
+        out.textContent = "Caricamento...";
+        try {
+          const res = await fetch(buildUrl("/api/v1/config"));
+          const cfg = await res.json();
+          document.getElementById("cfgApiKey").value = cfg.openai_api_key || "";
+          document.getElementById("cfgModel").value = cfg.model_name || "gpt-4.1-mini";
+          document.getElementById("cfgApproval").checked = !!cfg.require_human_approval;
+          document.getElementById("cfgAutopublish").checked = !!cfg.autopublish_enabled;
+          document.getElementById("cfgWhatsapp").checked = !!cfg.whatsapp_enabled;
+          out.textContent = JSON.stringify(cfg, null, 2);
+        } catch (e) {
+          out.textContent = `Errore caricamento config: ${e}`;
+        }
+      }
+
+      async function saveConfig() {
+        const out = document.getElementById("cfgOut");
+        out.textContent = "Salvataggio...";
+        try {
+          const body = {
+            openai_api_key: document.getElementById("cfgApiKey").value,
+            model_name: document.getElementById("cfgModel").value,
+            require_human_approval: document.getElementById("cfgApproval").checked,
+            autopublish_enabled: document.getElementById("cfgAutopublish").checked,
+            whatsapp_enabled: document.getElementById("cfgWhatsapp").checked
+          };
+          const res = await fetch(buildUrl("/api/v1/config"), {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body)
+          });
+          const data = await res.json();
+          out.textContent = JSON.stringify(data, null, 2);
+        } catch (e) {
+          out.textContent = `Errore salvataggio config: ${e}`;
         }
       }
 
@@ -91,17 +187,39 @@
         out.textContent = "Elaborazione...";
         try {
           const body = JSON.parse(document.getElementById(inputId).value);
-          const res = await fetch(endpoint, {
+          const url = buildUrl(endpoint);
+          const res = await fetch(url, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(body),
           });
+          if (!res.ok) {
+            const errText = await res.text();
+            out.textContent = `Errore HTTP ${res.status}\n${errText}`;
+            return;
+          }
           const data = await res.json();
           out.textContent = JSON.stringify(data, null, 2);
         } catch (e) {
-          out.textContent = `Errore: ${e}`;
+          const url = buildUrl(endpoint);
+          showFetchError(out, e, url);
         }
       }
+
+      (function init() {
+        const defaultBase = window.location.protocol.startsWith("http")
+          ? window.location.origin
+          : "http://127.0.0.1:8000";
+        document.getElementById("apiBase").value = defaultBase;
+
+        const hint = document.getElementById("runHint");
+        if (window.location.protocol === "file:") {
+          hint.innerHTML = `<span class="err">Attenzione:</span> stai aprendo la pagina da file locale. Avvia il server e apri <code>http://127.0.0.1:8000/</code>.`;
+        } else {
+          hint.innerHTML = `<span class="ok">Connessa a:</span> ${defaultBase}`;
+        }
+        loadConfig();
+      })();
     </script>
   </body>
 </html>

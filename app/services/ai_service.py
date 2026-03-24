@@ -6,6 +6,8 @@ from typing import Any
 
 from dotenv import load_dotenv
 
+from app.services.app_config_service import AppConfigService
+
 load_dotenv()
 
 
@@ -13,8 +15,9 @@ class AIService:
     """Wrapper minimale per usare OpenAI con fallback locale deterministico."""
 
     def __init__(self) -> None:
-        self.model = os.getenv("MODEL_NAME", "gpt-4.1-mini")
-        self.api_key = os.getenv("OPENAI_API_KEY")
+        config = AppConfigService().load()
+        self.model = os.getenv("MODEL_NAME") or config.get("model_name", "gpt-4.1-mini")
+        self.api_key = os.getenv("OPENAI_API_KEY") or config.get("openai_api_key")
 
     def generate_json(self, system_prompt: str, user_prompt: str, fallback: dict[str, Any]) -> dict[str, Any]:
         if not self.api_key:

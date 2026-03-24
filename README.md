@@ -203,10 +203,49 @@ uvicorn app.main:app --reload
 API disponibile su: `http://127.0.0.1:8000/docs`
 Interfaccia grafica web: `http://127.0.0.1:8000/`
 
+## Come usarla (anche se non conosci le API)
+
+1. Avvia il server (`uvicorn app.main:app --reload`).
+2. Apri il browser su `http://127.0.0.1:8000/` (non aprire `index.html` direttamente da file).
+3. Nell'interfaccia:
+   - clicca **Verifica API** per controllare connessione;
+   - usa i pulsanti **Genera strategia / Genera post / Genera campagne / Genera calendario**.
+
+### Che risultati ottieni
+
+- **Strategia**: posizionamento, pillar mensili, KPI, funnel offerta.
+- **Contenuti social**: elenco idee post con canale, hook, caption e call to action.
+- **Campagne ADS**: proposte campagne Meta/Google con target, copy, budget e KPI.
+- **Scheduler**: calendario editoriale con data, canale, orario e tema.
+
+### Errore `TypeError: Failed to fetch` nella UI
+
+Di solito significa che la pagina non riesce a raggiungere il backend:
+
+- verifica che il server sia attivo su `http://127.0.0.1:8000`;
+- usa la pagina da `http://127.0.0.1:8000/` (non da `file://...`);
+- controlla il campo **URL API Base** nella UI (deve essere `http://127.0.0.1:8000` in locale).
+
 ## Variabili ambiente
 
 - `OPENAI_API_KEY`: chiave API OpenAI (opzionale ma consigliata)
 - `MODEL_NAME`: modello da usare (default: `gpt-4.1-mini`)
+
+Puoi impostarle in due modi:
+
+1. **File `.env`** (metodo classico): nella root del progetto, copiando `.env.example` in `.env`.
+2. **Interfaccia grafica** su `http://127.0.0.1:8000/` nella sezione **Configurazioni (no-code)**, che salva su `data/app_config.json`.
+
+## Autorizzazione umana e autopubblicazione
+
+Nella UI trovi un workflow base:
+
+- `Richiedi approvazione umana` ✅: ogni pubblicazione va in stato `pending_approval`.
+- `Abilita autopubblicazione` ✅: se l'approvazione è disattivata, la pubblicazione passa in stato `simulated_published`.
+- `Abilita WhatsApp`: impostazione pronta lato configurazione (attualmente simulata).
+
+> Nota: in questa versione l'invio verso social/WhatsApp è **simulato**.  
+> Per pubblicazione reale servono integrazioni API dedicate (Meta Graph API, WhatsApp Business API, TikTok API, Google Ads API) e gestione token/permessi.
 
 ## Endpoint principali
 

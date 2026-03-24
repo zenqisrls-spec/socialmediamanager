@@ -92,3 +92,21 @@ class ScheduleItem(BaseModel):
 
 class ScheduleResponse(BaseModel):
     items: list[ScheduleItem]
+
+
+class AppConfig(BaseModel):
+    openai_api_key: str = ""
+    model_name: str = "gpt-4.1-mini"
+    require_human_approval: bool = True
+    autopublish_enabled: bool = False
+    whatsapp_enabled: bool = False
+
+
+class PublishRequest(BaseModel):
+    channel: str
+    content: str
+
+
+class PublishResponse(BaseModel):
+    status: str
+    message: str
