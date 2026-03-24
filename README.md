@@ -201,6 +201,7 @@ uvicorn app.main:app --reload
 ```
 
 API disponibile su: `http://127.0.0.1:8000/docs`
+Interfaccia grafica web: `http://127.0.0.1:8000/`
 
 ## Variabili ambiente
 

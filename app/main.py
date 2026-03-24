@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 from fastapi import FastAPI
+from fastapi.responses import FileResponse
 
 from app.schemas import (
     AdsRequest,
@@ -21,6 +24,12 @@ app = FastAPI(
 )
 
 service = MarketingService()
+WEB_INDEX = Path(__file__).resolve().parent / "web" / "index.html"
+
+
+@app.get("/", include_in_schema=False)
+def web_ui() -> FileResponse:
+    return FileResponse(WEB_INDEX)
 
 
 @app.get("/health")
