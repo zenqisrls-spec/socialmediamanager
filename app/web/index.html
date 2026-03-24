@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="it">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ZenQi Social Media Manager - UI</title>
+    <style>
+      body { font-family: Arial, sans-serif; margin: 24px; background: #f7f7fb; color: #1f2937; }
+      h1 { margin-bottom: 4px; }
+      .hint { color: #6b7280; margin-top: 0; }
+      .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; }
+      .card { background: white; border-radius: 12px; padding: 16px; box-shadow: 0 2px 8px rgba(0,0,0,.08); }
+      textarea { width: 100%; min-height: 180px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+      button { background: #2563eb; color: white; border: none; border-radius: 8px; padding: 10px 14px; cursor: pointer; }
+      button:hover { background: #1d4ed8; }
+      pre { background: #111827; color: #e5e7eb; padding: 12px; border-radius: 8px; overflow: auto; min-height: 120px; }
+      .ok { color: #059669; font-weight: 700; }
+      .err { color: #dc2626; font-weight: 700; }
+    </style>
+  </head>
+  <body>
+    <h1>ZenQi Social Media Manager</h1>
+    <p class="hint">Interfaccia web per usare l'API senza riga di comando.</p>
+    <p class="hint" id="runHint"></p>
+
+    <section class="card" style="margin-bottom: 16px;">
+      <h3>Configurazione rapida</h3>
+      <label for="apiBase"><strong>URL API Base</strong></label>
+      <input id="apiBase" style="width:100%; padding:8px; margin-top:6px;" />
+      <p class="hint" style="margin-bottom:0;">
+        Se hai avviato il server in locale usa: <code>http://127.0.0.1:8000</code>
+      </p>
+    </section>
+
+    <div class="grid">
+      <section class="card">
+        <h3>Health Check</h3>
+        <button onclick="callHealth()">Verifica API</button>
+        <p id="health"></p>
+      </section>
+
+      <section class="card">
+        <h3>Strategia</h3>
+        <textarea id="strategyBody">{
+  "goals": ["awareness", "retention"],
+  "monthly_budget_eur": 1200
+}</textarea>
+        <button onclick="callApi('/api/v1/strategy/generate', 'strategyBody', 'strategyOut')">Genera strategia</button>
+        <pre id="strategyOut"></pre>
+      </section>
+
+      <section class="card">
+        <h3>Contenuti social</h3>
+        <textarea id="contentBody">{
+  "goals": ["awareness", "lead_generation"],
+  "channels": ["instagram", "facebook"],
+  "posts_per_week": 4
+}</textarea>
+        <button onclick="callApi('/api/v1/content/generate-posts', 'contentBody', 'contentOut')">Genera post</button>
+        <pre id="contentOut"></pre>
+      </section>
+
+      <section class="card">
+        <h3>Campagne ADS</h3>
+        <textarea id="adsBody">{
+  "goals": ["lead_generation"],
+  "monthly_budget_eur": 1500
+}</textarea>
+        <button onclick="callApi('/api/v1/ads/generate-campaigns', 'adsBody', 'adsOut')">Genera campagne</button>
+        <pre id="adsOut"></pre>
+      </section>
+
+      <section class="card">
+        <h3>Scheduler</h3>
+        <textarea id="schedulerBody">{
+  "start_date": "2026-03-24",
+  "weeks": 4,
+  "channels": ["instagram", "facebook", "tiktok"],
+  "posts_per_week": 4
+}</textarea>
+        <button onclick="callApi('/api/v1/scheduler/build', 'schedulerBody', 'schedulerOut')">Genera calendario</button>
+        <pre id="schedulerOut"></pre>
+      </section>
+    </div>
+
+    <script>
+      function getApiBase() {
+        return document.getElementById("apiBase").value.replace(/\/$/, "");
+      }
+
+      function buildUrl(path) {
+        return `${getApiBase()}${path}`;
+      }
+
+      function showFetchError(out, error, url) {
+        out.textContent = [
+          `Errore: ${error}`,
+          "",
+          "Possibili cause:",
+          `1) Server non avviato su ${getApiBase()}`,
+          "2) Hai aperto il file HTML direttamente (file://) invece di http://127.0.0.1:8000/",
+          "3) URL API base errato",
+          "",
+          `URL chiamato: ${url}`
+        ].join("\n");
+      }
+
+      async function callHealth() {
+        const health = document.getElementById("health");
+        health.textContent = "Controllo in corso...";
+        try {
+          const url = buildUrl("/health");
+          const res = await fetch(url);
+          const data = await res.json();
+          health.innerHTML = `<span class="ok">OK:</span> ${JSON.stringify(data)}`;
+        } catch (e) {
+          health.innerHTML = `<span class="err">Errore:</span> ${e}`;
+        }
+      }
+
+      async function callApi(endpoint, inputId, outId) {
+        const out = document.getElementById(outId);
+        out.textContent = "Elaborazione...";
+        try {
+          const body = JSON.parse(document.getElementById(inputId).value);
+          const url = buildUrl(endpoint);
+          const res = await fetch(url, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body),
+          });
+          if (!res.ok) {
+            const errText = await res.text();
+            out.textContent = `Errore HTTP ${res.status}\n${errText}`;
+            return;
+          }
+          const data = await res.json();
+          out.textContent = JSON.stringify(data, null, 2);
+        } catch (e) {
+          const url = buildUrl(endpoint);
+          showFetchError(out, e, url);
+        }
+      }
+
+      (function init() {
+        const defaultBase = window.location.protocol.startsWith("http")
+          ? window.location.origin
+          : "http://127.0.0.1:8000";
+        document.getElementById("apiBase").value = defaultBase;
+
+        const hint = document.getElementById("runHint");
+        if (window.location.protocol === "file:") {
+          hint.innerHTML = `<span class="err">Attenzione:</span> stai aprendo la pagina da file locale. Avvia il server e apri <code>http://127.0.0.1:8000/</code>.`;
+        } else {
+          hint.innerHTML = `<span class="ok">Connessa a:</span> ${defaultBase}`;
+        }
+      })();
+    </script>
+  </body>
+</html>
