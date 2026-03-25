@@ -1,0 +1,377 @@
+<!doctype html>
+<html lang="it">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ZenQi Social Media Manager - UI</title>
+    <style>
+      body { font-family: Arial, sans-serif; margin: 24px; background: #f7f7fb; color: #1f2937; }
+      h1 { margin-bottom: 4px; }
+      .hint { color: #6b7280; margin-top: 0; }
+      .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; }
+      .card { background: white; border-radius: 12px; padding: 16px; box-shadow: 0 2px 8px rgba(0,0,0,.08); }
+      textarea { width: 100%; min-height: 180px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+      button { background: #2563eb; color: white; border: none; border-radius: 8px; padding: 10px 14px; cursor: pointer; }
+      button:hover { background: #1d4ed8; }
+      pre { background: #111827; color: #e5e7eb; padding: 12px; border-radius: 8px; overflow: auto; min-height: 120px; }
+      .ok { color: #059669; font-weight: 700; }
+      .err { color: #dc2626; font-weight: 700; }
+    </style>
+  </head>
+  <body>
+    <h1>ZenQi Social Media Manager</h1>
+    <p class="hint">Interfaccia web per usare l'API senza riga di comando.</p>
+    <p class="hint" id="runHint"></p>
+
+    <section class="card" style="margin-bottom: 16px;">
+      <h3>Configurazione rapida</h3>
+      <label for="apiBase"><strong>URL API Base</strong></label>
+      <input id="apiBase" style="width:100%; padding:8px; margin-top:6px;" />
+      <p class="hint" style="margin-bottom:0;">
+        Se hai avviato il server in locale usa: <code>http://127.0.0.1:8000</code>
+      </p>
+    </section>
+
+    <section class="card" style="margin-bottom: 16px;">
+      <h3>Login utenti / ruoli</h3>
+      <p class="hint">Utenti demo: admin/admin123, approver/approver123, editor/editor123</p>
+      <input id="loginUser" placeholder="username" style="padding:8px; width:49%;" />
+      <input id="loginPass" placeholder="password" type="password" style="padding:8px; width:49%;" />
+      <button onclick="login()">Login</button>
+      <pre id="loginOut"></pre>
+    </section>
+
+    <div class="grid">
+      <section class="card">
+        <h3>Configurazioni (no-code)</h3>
+        <label>OpenAI API Key</label>
+        <input id="cfgApiKey" type="password" style="width:100%; padding:8px; margin-bottom:8px;" />
+        <label>Model Name</label>
+        <input id="cfgModel" value="gpt-4.1-mini" style="width:100%; padding:8px; margin-bottom:8px;" />
+        <label>Meta Access Token</label>
+        <input id="cfgMetaToken" type="password" style="width:100%; padding:8px; margin-bottom:8px;" />
+        <label>Meta Page ID</label>
+        <input id="cfgMetaPageId" style="width:100%; padding:8px; margin-bottom:8px;" />
+        <label>WhatsApp Token</label>
+        <input id="cfgWaToken" type="password" style="width:100%; padding:8px; margin-bottom:8px;" />
+        <label>WhatsApp Phone Number ID</label>
+        <input id="cfgWaPhoneId" style="width:100%; padding:8px; margin-bottom:8px;" />
+        <label>WhatsApp destinatario (numero)</label>
+        <input id="cfgWaTo" style="width:100%; padding:8px; margin-bottom:8px;" />
+        <label><input id="cfgApproval" type="checkbox" checked /> Richiedi approvazione umana</label><br />
+        <label><input id="cfgAutopublish" type="checkbox" /> Abilita autopubblicazione</label><br />
+        <label><input id="cfgWhatsapp" type="checkbox" /> Abilita WhatsApp (simulato)</label><br /><br />
+        <button onclick="loadConfig()">Carica config</button>
+        <button onclick="saveConfig()">Salva config</button>
+        <pre id="cfgOut"></pre>
+      </section>
+
+      <section class="card">
+        <h3>Health Check</h3>
+        <button onclick="callHealth()">Verifica API</button>
+        <p id="health"></p>
+      </section>
+
+      <section class="card">
+        <h3>Strategia</h3>
+        <textarea id="strategyBody">{
+  "goals": ["awareness", "retention"],
+  "monthly_budget_eur": 1200
+}</textarea>
+        <button onclick="callApi('/api/v1/strategy/generate', 'strategyBody', 'strategyOut')">Genera strategia</button>
+        <pre id="strategyOut"></pre>
+      </section>
+
+      <section class="card">
+        <h3>Contenuti social</h3>
+        <textarea id="contentBody">{
+  "goals": ["awareness", "lead_generation"],
+  "channels": ["instagram", "facebook"],
+  "posts_per_week": 4
+}</textarea>
+        <button onclick="callApi('/api/v1/content/generate-posts', 'contentBody', 'contentOut')">Genera post</button>
+        <pre id="contentOut"></pre>
+      </section>
+
+      <section class="card">
+        <h3>Campagne ADS</h3>
+        <textarea id="adsBody">{
+  "goals": ["lead_generation"],
+  "monthly_budget_eur": 1500
+}</textarea>
+        <button onclick="callApi('/api/v1/ads/generate-campaigns', 'adsBody', 'adsOut')">Genera campagne</button>
+        <pre id="adsOut"></pre>
+      </section>
+
+      <section class="card">
+        <h3>Scheduler</h3>
+        <textarea id="schedulerBody">{
+  "start_date": "2026-03-24",
+  "weeks": 4,
+  "channels": ["instagram", "facebook", "tiktok"],
+  "posts_per_week": 4
+}</textarea>
+        <button onclick="callApi('/api/v1/scheduler/build', 'schedulerBody', 'schedulerOut')">Genera calendario</button>
+        <pre id="schedulerOut"></pre>
+      </section>
+
+      <section class="card">
+        <h3>Workflow pubblicazione (con approvazione)</h3>
+        <textarea id="publishBody">{
+  "channel": "instagram",
+  "content": "Post prova: respiro consapevole 5 minuti al giorno."
+}</textarea>
+        <button onclick="callApi('/api/v1/workflow/publish', 'publishBody', 'publishOut')">Invia al workflow</button>
+        <pre id="publishOut"></pre>
+      </section>
+
+      <section class="card">
+        <h3>Automazione completa</h3>
+        <textarea id="autoDraftBody">{
+  "channel": "instagram",
+  "content": "Post automatico del giorno",
+  "scheduled_for": "2026-03-25T10:00:00+00:00"
+}</textarea>
+        <button onclick="callApi('/api/v1/automation/drafts', 'autoDraftBody', 'autoOut', 'POST')">Crea bozza</button>
+        <button onclick="loadAutomationDrafts()">Lista bozze</button>
+        <button onclick="runAutomation()">Esegui automazione ora</button>
+        <div style="margin-top:10px;">
+          <input id="draftIdAction" placeholder="ID bozza da approvare/rifiutare" style="width:100%; padding:8px;" />
+          <div style="margin-top:8px;">
+            <button onclick="approveDraft()">Approva bozza</button>
+            <button onclick="rejectDraft()">Rifiuta bozza</button>
+          </div>
+        </div>
+        <pre id="autoOut"></pre>
+      </section>
+
+      <section class="card">
+        <h3>Dashboard operativo</h3>
+        <button onclick="loadDashboard()">Aggiorna KPI</button>
+        <pre id="dashOut"></pre>
+      </section>
+    </div>
+
+    <script>
+      let authToken = "";
+
+      function getApiBase() {
+        return document.getElementById("apiBase").value.replace(/\/$/, "");
+      }
+
+      function buildUrl(path) {
+        return `${getApiBase()}${path}`;
+      }
+
+      function showFetchError(out, error, url) {
+        out.textContent = [
+          `Errore: ${error}`,
+          "",
+          "Possibili cause:",
+          `1) Server non avviato su ${getApiBase()}`,
+          "2) Hai aperto il file HTML direttamente (file://) invece di http://127.0.0.1:8000/",
+          "3) URL API base errato",
+          "",
+          `URL chiamato: ${url}`
+        ].join("\n");
+      }
+
+      async function callHealth() {
+        const health = document.getElementById("health");
+        health.textContent = "Controllo in corso...";
+        try {
+          const url = buildUrl("/health");
+          const res = await fetch(url);
+          const data = await res.json();
+          health.innerHTML = `<span class="ok">OK:</span> ${JSON.stringify(data)}`;
+        } catch (e) {
+          health.innerHTML = `<span class="err">Errore:</span> ${e}`;
+        }
+      }
+
+      async function login() {
+        const out = document.getElementById("loginOut");
+        out.textContent = "Login...";
+        try {
+          const res = await fetch(buildUrl("/api/v1/auth/login"), {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              username: document.getElementById("loginUser").value,
+              password: document.getElementById("loginPass").value
+            })
+          });
+          const data = await res.json();
+          if (!res.ok) {
+            out.textContent = JSON.stringify(data, null, 2);
+            return;
+          }
+          authToken = data.access_token;
+          out.textContent = `Login OK. Ruolo: ${data.role}`;
+        } catch (e) {
+          out.textContent = `Errore login: ${e}`;
+        }
+      }
+
+      async function loadConfig() {
+        const out = document.getElementById("cfgOut");
+        out.textContent = "Caricamento...";
+        try {
+          const res = await fetch(buildUrl("/api/v1/config"));
+          const cfg = await res.json();
+          document.getElementById("cfgApiKey").value = cfg.openai_api_key || "";
+          document.getElementById("cfgModel").value = cfg.model_name || "gpt-4.1-mini";
+          document.getElementById("cfgApproval").checked = !!cfg.require_human_approval;
+          document.getElementById("cfgAutopublish").checked = !!cfg.autopublish_enabled;
+          document.getElementById("cfgWhatsapp").checked = !!cfg.whatsapp_enabled;
+          document.getElementById("cfgMetaToken").value = cfg.meta_access_token || "";
+          document.getElementById("cfgMetaPageId").value = cfg.meta_page_id || "";
+          document.getElementById("cfgWaToken").value = cfg.whatsapp_token || "";
+          document.getElementById("cfgWaPhoneId").value = cfg.whatsapp_phone_number_id || "";
+          document.getElementById("cfgWaTo").value = cfg.whatsapp_to || "";
+          out.textContent = JSON.stringify(cfg, null, 2);
+        } catch (e) {
+          out.textContent = `Errore caricamento config: ${e}`;
+        }
+      }
+
+      async function saveConfig() {
+        const out = document.getElementById("cfgOut");
+        out.textContent = "Salvataggio...";
+        try {
+          const body = {
+            openai_api_key: document.getElementById("cfgApiKey").value,
+            model_name: document.getElementById("cfgModel").value,
+            require_human_approval: document.getElementById("cfgApproval").checked,
+            autopublish_enabled: document.getElementById("cfgAutopublish").checked,
+            whatsapp_enabled: document.getElementById("cfgWhatsapp").checked,
+            meta_access_token: document.getElementById("cfgMetaToken").value,
+            meta_page_id: document.getElementById("cfgMetaPageId").value,
+            whatsapp_token: document.getElementById("cfgWaToken").value,
+            whatsapp_phone_number_id: document.getElementById("cfgWaPhoneId").value,
+            whatsapp_to: document.getElementById("cfgWaTo").value
+          };
+          const res = await fetch(buildUrl("/api/v1/config"), {
+            method: "PUT",
+            headers: { "Content-Type": "application/json", "Authorization": `Bearer ${authToken}` },
+            body: JSON.stringify(body)
+          });
+          const data = await res.json();
+          out.textContent = JSON.stringify(data, null, 2);
+        } catch (e) {
+          out.textContent = `Errore salvataggio config: ${e}`;
+        }
+      }
+
+      async function callApi(endpoint, inputId, outId, method = "POST") {
+        const out = document.getElementById(outId);
+        out.textContent = "Elaborazione...";
+        try {
+          const body = inputId ? JSON.parse(document.getElementById(inputId).value) : null;
+          const url = buildUrl(endpoint);
+          const res = await fetch(url, {
+            method,
+            headers: { "Content-Type": "application/json", "Authorization": `Bearer ${authToken}` },
+            body: body ? JSON.stringify(body) : undefined,
+          });
+          if (!res.ok) {
+            const errText = await res.text();
+            out.textContent = `Errore HTTP ${res.status}\n${errText}`;
+            return;
+          }
+          const data = await res.json();
+          out.textContent = JSON.stringify(data, null, 2);
+        } catch (e) {
+          const url = buildUrl(endpoint);
+          showFetchError(out, e, url);
+        }
+      }
+
+      async function loadAutomationDrafts() {
+        const out = document.getElementById("autoOut");
+        out.textContent = "Caricamento bozze...";
+        try {
+          const res = await fetch(buildUrl("/api/v1/automation/drafts"));
+          const drafts = await res.json();
+          const publishedRes = await fetch(buildUrl("/api/v1/automation/published"));
+          const published = await publishedRes.json();
+          out.textContent = JSON.stringify({ drafts, published }, null, 2);
+        } catch (e) {
+          out.textContent = `Errore caricamento automazione: ${e}`;
+        }
+      }
+
+      async function runAutomation() {
+        const out = document.getElementById("autoOut");
+        out.textContent = "Esecuzione automazione...";
+        try {
+          const res = await fetch(buildUrl("/api/v1/automation/run"), {
+            method: "POST",
+            headers: { "Authorization": `Bearer ${authToken}` }
+          });
+          const data = await res.json();
+          out.textContent = `Risultato run:\n${JSON.stringify(data, null, 2)}`;
+        } catch (e) {
+          out.textContent = `Errore run automazione: ${e}`;
+        }
+      }
+
+      async function loadDashboard() {
+        const out = document.getElementById("dashOut");
+        out.textContent = "Caricamento KPI...";
+        try {
+          const res = await fetch(buildUrl("/api/v1/dashboard/summary"));
+          out.textContent = JSON.stringify(await res.json(), null, 2);
+        } catch (e) {
+          out.textContent = `Errore dashboard: ${e}`;
+        }
+      }
+
+      async function approveDraft() {
+        const id = document.getElementById("draftIdAction").value.trim();
+        if (!id) return;
+        const out = document.getElementById("autoOut");
+        try {
+          const res = await fetch(buildUrl(`/api/v1/automation/drafts/${id}/approve`), {
+            method: "POST",
+            headers: { "Authorization": `Bearer ${authToken}` }
+          });
+          out.textContent = JSON.stringify(await res.json(), null, 2);
+        } catch (e) {
+          out.textContent = `Errore approvazione: ${e}`;
+        }
+      }
+
+      async function rejectDraft() {
+        const id = document.getElementById("draftIdAction").value.trim();
+        if (!id) return;
+        const out = document.getElementById("autoOut");
+        try {
+          const res = await fetch(buildUrl(`/api/v1/automation/drafts/${id}/reject`), {
+            method: "POST",
+            headers: { "Authorization": `Bearer ${authToken}` }
+          });
+          out.textContent = JSON.stringify(await res.json(), null, 2);
+        } catch (e) {
+          out.textContent = `Errore rifiuto: ${e}`;
+        }
+      }
+
+      (function init() {
+        const defaultBase = window.location.protocol.startsWith("http")
+          ? window.location.origin
+          : "http://127.0.0.1:8000";
+        document.getElementById("apiBase").value = defaultBase;
+
+        const hint = document.getElementById("runHint");
+        if (window.location.protocol === "file:") {
+          hint.innerHTML = `<span class="err">Attenzione:</span> stai aprendo la pagina da file locale. Avvia il server e apri <code>http://127.0.0.1:8000/</code>.`;
+        } else {
+          hint.innerHTML = `<span class="ok">Connessa a:</span> ${defaultBase}`;
+        }
+        loadConfig();
+        loadDashboard();
+      })();
+    </script>
+  </body>
+</html>
