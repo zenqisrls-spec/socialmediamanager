@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-import json
 import uuid
 from datetime import datetime, timezone
-from pathlib import Path
-from threading import Lock
 from typing import Any
+
+from app.services.db_service import DBService
+from app.services.publisher_service import PublisherService
 
 
 def _now_iso() -> str:
@@ -22,57 +22,60 @@ def _is_due(when: str) -> bool:
 
 class AutomationService:
     def __init__(self) -> None:
-        self.path = Path(__file__).resolve().parents[2] / "data" / "automation_state.json"
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        self._lock = Lock()
-
-    def _read(self) -> dict[str, Any]:
-        if not self.path.exists():
-            return {"drafts": [], "published": []}
-        try:
-            return json.loads(self.path.read_text(encoding="utf-8"))
-        except Exception:
-            return {"drafts": [], "published": []}
-
-    def _write(self, data: dict[str, Any]) -> None:
-        self.path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+        self.db = DBService()
+        self.publisher = PublisherService()
 
     def create_draft(self, channel: str, content: str, scheduled_for: str | None) -> dict[str, Any]:
-        with self._lock:
-            state = self._read()
-            item = {
-                "id": str(uuid.uuid4()),
-                "channel": channel,
-                "content": content,
-                "status": "pending_approval",
-                "scheduled_for": scheduled_for or _now_iso(),
-                "created_at": _now_iso(),
-                "updated_at": _now_iso(),
-            }
-            state["drafts"].append(item)
-            self._write(state)
-            return item
+        item = {
+            "id": str(uuid.uuid4()),
+            "channel": channel,
+            "content": content,
+            "status": "pending_approval",
+            "scheduled_for": scheduled_for or _now_iso(),
+            "created_at": _now_iso(),
+            "updated_at": _now_iso(),
+        }
+        with self.db.connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO drafts(id, channel, content, status, scheduled_for, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    item["id"],
+                    item["channel"],
+                    item["content"],
+                    item["status"],
+                    item["scheduled_for"],
+                    item["created_at"],
+                    item["updated_at"],
+                ),
+            )
+            conn.commit()
+        return item
 
     def list_drafts(self, status: str | None = None) -> list[dict[str, Any]]:
-        state = self._read()
-        drafts = state.get("drafts", [])
-        if status:
-            return [d for d in drafts if d.get("status") == status]
-        return drafts
+        with self.db.connect() as conn:
+            if status:
+                rows = conn.execute("SELECT * FROM drafts WHERE status=? ORDER BY created_at DESC", (status,)).fetchall()
+            else:
+                rows = conn.execute("SELECT * FROM drafts ORDER BY created_at DESC").fetchall()
+        return [dict(r) for r in rows]
 
     def list_published(self) -> list[dict[str, Any]]:
-        return self._read().get("published", [])
+        with self.db.connect() as conn:
+            rows = conn.execute("SELECT draft_id, channel, status, message, published_at FROM published ORDER BY id DESC").fetchall()
+        return [dict(r) for r in rows]
 
     def _update_status(self, draft_id: str, status: str) -> dict[str, Any] | None:
-        with self._lock:
-            state = self._read()
-            for item in state["drafts"]:
-                if item["id"] == draft_id:
-                    item["status"] = status
-                    item["updated_at"] = _now_iso()
-                    self._write(state)
-                    return item
-            return None
+        with self.db.connect() as conn:
+            row = conn.execute("SELECT * FROM drafts WHERE id=?", (draft_id,)).fetchone()
+            if not row:
+                return None
+            conn.execute("UPDATE drafts SET status=?, updated_at=? WHERE id=?", (status, _now_iso(), draft_id))
+            conn.commit()
+            updated = conn.execute("SELECT * FROM drafts WHERE id=?", (draft_id,)).fetchone()
+        return dict(updated) if updated else None
 
     def approve(self, draft_id: str) -> dict[str, Any] | None:
         return self._update_status(draft_id, "approved")
@@ -80,51 +83,59 @@ class AutomationService:
     def reject(self, draft_id: str) -> dict[str, Any] | None:
         return self._update_status(draft_id, "rejected")
 
-    def _simulate_publish(self, channel: str, content: str, whatsapp_enabled: bool) -> dict[str, Any]:
-        message = f"Pubblicato su {channel} (simulato)."
-        if channel.lower() == "whatsapp" and not whatsapp_enabled:
-            return {"status": "failed", "message": "WhatsApp non abilitato in configurazione."}
-        return {"status": "published", "message": message, "content_preview": content[:120]}
-
-    def run(self, *, require_human_approval: bool, autopublish_enabled: bool, whatsapp_enabled: bool) -> dict[str, int]:
-        with self._lock:
-            state = self._read()
-            processed = 0
-            published = 0
-            failed = 0
-
-            for item in state.get("drafts", []):
-                if item.get("status") in {"published", "rejected"}:
+    def run(self, *, require_human_approval: bool, autopublish_enabled: bool, cfg: dict[str, Any]) -> dict[str, int]:
+        processed = 0
+        published = 0
+        failed = 0
+        with self.db.connect() as conn:
+            rows = conn.execute("SELECT * FROM drafts ORDER BY created_at ASC").fetchall()
+            for row in rows:
+                item = dict(row)
+                if item["status"] in {"published", "rejected", "failed"}:
                     continue
-                if require_human_approval and item.get("status") != "approved":
+                if require_human_approval and item["status"] != "approved":
                     continue
-                if not require_human_approval and item.get("status") == "pending_approval":
+                if not require_human_approval and item["status"] == "pending_approval":
+                    conn.execute("UPDATE drafts SET status=?, updated_at=? WHERE id=?", ("approved", _now_iso(), item["id"]))
                     item["status"] = "approved"
-
                 if not autopublish_enabled:
                     continue
                 if not _is_due(item.get("scheduled_for", "")):
                     continue
 
-                result = self._simulate_publish(item["channel"], item["content"], whatsapp_enabled)
+                result = self.publisher.publish(item["channel"], item["content"], cfg)
                 processed += 1
                 if result["status"] == "published":
                     published += 1
-                    item["status"] = "published"
                 else:
                     failed += 1
-                    item["status"] = "failed"
-                item["updated_at"] = _now_iso()
-                state["published"].append(
-                    {
-                        "draft_id": item["id"],
-                        "channel": item["channel"],
-                        "status": result["status"],
-                        "message": result["message"],
-                        "published_at": _now_iso(),
-                    }
+                new_status = "published" if result["status"] == "published" else "failed"
+                conn.execute("UPDATE drafts SET status=?, updated_at=? WHERE id=?", (new_status, _now_iso(), item["id"]))
+                conn.execute(
+                    "INSERT INTO published(draft_id, channel, status, message, published_at) VALUES (?, ?, ?, ?, ?)",
+                    (item["id"], item["channel"], result["status"], result["message"], _now_iso()),
                 )
+            conn.commit()
+        return {"processed": processed, "published": published, "failed": failed}
 
-            self._write(state)
-            return {"processed": processed, "published": published, "failed": failed}
+    def summary(self) -> dict[str, Any]:
+        drafts = self.list_drafts()
+        published_items = self.list_published()
+
+        by_status: dict[str, int] = {}
+        by_channel: dict[str, int] = {}
+        for d in drafts:
+            by_status[d["status"]] = by_status.get(d["status"], 0) + 1
+            by_channel[d["channel"]] = by_channel.get(d["channel"], 0) + 1
+
+        published_ok = len([p for p in published_items if p["status"] == "published"])
+        published_failed = len([p for p in published_items if p["status"] == "failed"])
+        return {
+            "drafts_total": len(drafts),
+            "published_total": len(published_items),
+            "published_ok": published_ok,
+            "published_failed": published_failed,
+            "drafts_by_status": by_status,
+            "drafts_by_channel": by_channel,
+        }
 

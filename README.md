@@ -2,6 +2,8 @@
 
 Applicazione MVP per automatizzare la gestione social e pubblicitaria del centro olistico **ZenQi SRLS** (`zenqi.it`).
 
+📘 Manuale utente completo (installazione/configurazione/uso): `USER_MANUALE.md`
+
 ## Funzionalità
 
 - Definizione obiettivi marketing (awareness, acquisizione lead, fidelizzazione).
@@ -16,6 +18,7 @@ Applicazione MVP per automatizzare la gestione social e pubblicitaria del centro
 - FastAPI
 - Pydantic
 - Uvicorn
+- SQLite (database locale reale `data/app.db`)
 - Integrazione AI via OpenAI API (opzionale, con fallback locale)
 
 ## Cosa installare per farla funzionare
@@ -234,7 +237,7 @@ Di solito significa che la pagina non riesce a raggiungere il backend:
 Puoi impostarle in due modi:
 
 1. **File `.env`** (metodo classico): nella root del progetto, copiando `.env.example` in `.env`.
-2. **Interfaccia grafica** su `http://127.0.0.1:8000/` nella sezione **Configurazioni (no-code)**, che salva su `data/app_config.json`.
+2. **Interfaccia grafica** su `http://127.0.0.1:8000/` nella sezione **Configurazioni (no-code)**, che salva su `data/app.db`.
 
 ## Autorizzazione umana e autopubblicazione
 
@@ -244,8 +247,8 @@ Nella UI trovi un workflow base:
 - `Abilita autopubblicazione` ✅: se l'approvazione è disattivata, la pubblicazione passa in stato `simulated_published`.
 - `Abilita WhatsApp`: impostazione pronta lato configurazione (attualmente simulata).
 
-> Nota: in questa versione l'invio verso social/WhatsApp è **simulato**.  
-> Per pubblicazione reale servono integrazioni API dedicate (Meta Graph API, WhatsApp Business API, TikTok API, Google Ads API) e gestione token/permessi.
+> Nota: pubblicazione reale attiva per **Meta Graph API** e **WhatsApp Business API** quando inserisci credenziali valide.  
+> TikTok API e Google Ads API sono predisposte ma da completare lato credenziali/business setup.
 
 ## Versione con automazione completa (operativa)
 
@@ -265,7 +268,51 @@ Endpoint automazione:
 - `POST /api/v1/automation/run`
 - `GET /api/v1/automation/published`
 
-Il sistema salva stato in `data/automation_state.json`.
+Il sistema salva stato/configurazioni/utenti/audit in `data/app.db` (SQLite).
+
+### Dashboard di controllo
+
+Endpoint:
+
+- `GET /api/v1/dashboard/summary`
+
+Mostra KPI operativi in tempo reale:
+- bozze totali,
+- pubblicazioni totali,
+- pubblicazioni riuscite/fallite,
+- distribuzione bozze per stato e canale.
+
+## Sicurezza (login, ruoli, audit)
+
+- Endpoint login: `POST /api/v1/auth/login`
+- Utenti demo:
+  - `admin / admin123`
+  - `approver / approver123`
+  - `editor / editor123`
+- Ruoli:
+  - `admin`: configurazione + run automazione
+  - `approver`: approva/rifiuta bozze
+  - `editor`: crea bozze
+- Audit trail persistente su DB tabella `audit_logs`.
+- Endpoint audit logs (admin): `GET /api/v1/audit/logs`
+
+## Integrazioni API ufficiali
+
+Supporto implementato:
+
+- **Meta Graph API** (Facebook/Instagram post feed) con `meta_access_token` + `meta_page_id`.
+- **WhatsApp Business API** (messaggio testuale) con `whatsapp_token` + `whatsapp_phone_number_id` + `whatsapp_to`.
+
+Supporto predisposto (da completare credenziali/business setup):
+
+- TikTok API
+- Google Ads API
+
+## Osservabilità & resilienza
+
+- Logging audit persistente (`audit_logs`).
+- Retry con backoff su chiamate publish esterne.
+- CI automatica con GitHub Actions + test `pytest`.
 
 ## Endpoint principali
 

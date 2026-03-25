@@ -100,6 +100,11 @@ class AppConfig(BaseModel):
     require_human_approval: bool = True
     autopublish_enabled: bool = False
     whatsapp_enabled: bool = False
+    meta_access_token: str = ""
+    meta_page_id: str = ""
+    whatsapp_token: str = ""
+    whatsapp_phone_number_id: str = ""
+    whatsapp_to: str = ""
 
 
 class PublishRequest(BaseModel):
@@ -140,3 +145,29 @@ class PublishedItem(BaseModel):
     status: str
     message: str
     published_at: str
+
+
+class DashboardSummary(BaseModel):
+    drafts_total: int
+    published_total: int
+    published_ok: int
+    published_failed: int
+    drafts_by_status: dict[str, int]
+    drafts_by_channel: dict[str, int]
+
+
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+
+class LoginResponse(BaseModel):
+    access_token: str
+    role: str
+
+
+class AuditLogItem(BaseModel):
+    ts: str
+    username: str
+    action: str
+    details: str
