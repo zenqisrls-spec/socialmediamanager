@@ -157,6 +157,9 @@ Campi importanti:
 
 ## 9) Come usare l’app (flusso consigliato)
 
+> Interfaccia aggiornata: non è più necessario scrivere JSON manualmente.  
+> Usi campi guidati, menu a tendina e pulsanti.
+
 ### Fase A — Generazione contenuti
 
 Nelle card dedicate:
@@ -166,7 +169,7 @@ Nelle card dedicate:
 - **Campagne ADS**
 - **Scheduler**
 
-modifica i JSON precompilati e clicca i pulsanti “Genera…”.
+compila i campi richiesti e clicca i pulsanti “Genera…”.
 
 ### Fase B — Workflow pubblicazione
 
@@ -248,4 +251,3 @@ pip install -r requirements.txt --upgrade
 - migrazione PostgreSQL
 - monitoraggio errori/alert (Sentry/Prometheus)
 - test end-to-end su integrazioni esterne
-
