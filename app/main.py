@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 from pathlib import Path
+import asyncio
 
 from fastapi import FastAPI
+from fastapi import HTTPException
 from fastapi.responses import FileResponse
 
 from app.schemas import (
@@ -11,6 +13,10 @@ from app.schemas import (
     AdsResponse,
     ContentRequest,
     ContentResponse,
+    AutomationDraft,
+    AutomationDraftCreateRequest,
+    AutomationRunResponse,
+    PublishedItem,
     PublishRequest,
     PublishResponse,
     ScheduleRequest,
@@ -19,6 +25,7 @@ from app.schemas import (
     StrategyResponse,
 )
 from app.services.app_config_service import AppConfigService
+from app.services.automation_service import AutomationService
 from app.services.marketing_service import MarketingService
 
 app = FastAPI(
@@ -29,7 +36,9 @@ app = FastAPI(
 
 service = MarketingService()
 config_service = AppConfigService()
+automation_service = AutomationService()
 WEB_INDEX = Path(__file__).resolve().parent / "web" / "index.html"
+automation_task: asyncio.Task | None = None
 
 
 @app.get("/", include_in_schema=False)
@@ -89,3 +98,70 @@ def publish_with_approval(payload: PublishRequest) -> PublishResponse:
         status="simulated_published",
         message=f"Pubblicazione simulata su {payload.channel}. (Integrazione API social non ancora attiva).",
     )
+
+
+@app.post("/api/v1/automation/drafts", response_model=AutomationDraft)
+def create_automation_draft(payload: AutomationDraftCreateRequest) -> AutomationDraft:
+    item = automation_service.create_draft(payload.channel, payload.content, payload.scheduled_for)
+    return AutomationDraft(**item)
+
+
+@app.get("/api/v1/automation/drafts", response_model=list[AutomationDraft])
+def get_automation_drafts(status: str | None = None) -> list[AutomationDraft]:
+    return [AutomationDraft(**item) for item in automation_service.list_drafts(status=status)]
+
+
+@app.post("/api/v1/automation/drafts/{draft_id}/approve", response_model=AutomationDraft)
+def approve_automation_draft(draft_id: str) -> AutomationDraft:
+    item = automation_service.approve(draft_id)
+    if not item:
+        raise HTTPException(status_code=404, detail="Draft non trovata")
+    return AutomationDraft(**item)
+
+
+@app.post("/api/v1/automation/drafts/{draft_id}/reject", response_model=AutomationDraft)
+def reject_automation_draft(draft_id: str) -> AutomationDraft:
+    item = automation_service.reject(draft_id)
+    if not item:
+        raise HTTPException(status_code=404, detail="Draft non trovata")
+    return AutomationDraft(**item)
+
+
+@app.get("/api/v1/automation/published", response_model=list[PublishedItem])
+def get_published_items() -> list[PublishedItem]:
+    return [PublishedItem(**item) for item in automation_service.list_published()]
+
+
+@app.post("/api/v1/automation/run", response_model=AutomationRunResponse)
+def run_automation_now() -> AutomationRunResponse:
+    cfg = config_service.load()
+    result = automation_service.run(
+        require_human_approval=cfg.get("require_human_approval", True),
+        autopublish_enabled=cfg.get("autopublish_enabled", False),
+        whatsapp_enabled=cfg.get("whatsapp_enabled", False),
+    )
+    return AutomationRunResponse(**result)
+
+
+async def _automation_loop() -> None:
+    while True:
+        cfg = config_service.load()
+        automation_service.run(
+            require_human_approval=cfg.get("require_human_approval", True),
+            autopublish_enabled=cfg.get("autopublish_enabled", False),
+            whatsapp_enabled=cfg.get("whatsapp_enabled", False),
+        )
+        await asyncio.sleep(30)
+
+
+@app.on_event("startup")
+async def _on_startup() -> None:
+    global automation_task
+    automation_task = asyncio.create_task(_automation_loop())
+
+
+@app.on_event("shutdown")
+async def _on_shutdown() -> None:
+    global automation_task
+    if automation_task:
+        automation_task.cancel()

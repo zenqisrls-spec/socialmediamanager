@@ -110,3 +110,33 @@ class PublishRequest(BaseModel):
 class PublishResponse(BaseModel):
     status: str
     message: str
+
+
+class AutomationDraftCreateRequest(BaseModel):
+    channel: str
+    content: str
+    scheduled_for: str | None = None
+
+
+class AutomationDraft(BaseModel):
+    id: str
+    channel: str
+    content: str
+    status: str
+    scheduled_for: str
+    created_at: str
+    updated_at: str
+
+
+class AutomationRunResponse(BaseModel):
+    processed: int
+    published: int
+    failed: int
+
+
+class PublishedItem(BaseModel):
+    draft_id: str
+    channel: str
+    status: str
+    message: str
+    published_at: str

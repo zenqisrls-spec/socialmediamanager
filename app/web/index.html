@@ -105,6 +105,26 @@
         <button onclick="callApi('/api/v1/workflow/publish', 'publishBody', 'publishOut')">Invia al workflow</button>
         <pre id="publishOut"></pre>
       </section>
+
+      <section class="card">
+        <h3>Automazione completa</h3>
+        <textarea id="autoDraftBody">{
+  "channel": "instagram",
+  "content": "Post automatico del giorno",
+  "scheduled_for": "2026-03-25T10:00:00+00:00"
+}</textarea>
+        <button onclick="callApi('/api/v1/automation/drafts', 'autoDraftBody', 'autoOut', 'POST')">Crea bozza</button>
+        <button onclick="loadAutomationDrafts()">Lista bozze</button>
+        <button onclick="runAutomation()">Esegui automazione ora</button>
+        <div style="margin-top:10px;">
+          <input id="draftIdAction" placeholder="ID bozza da approvare/rifiutare" style="width:100%; padding:8px;" />
+          <div style="margin-top:8px;">
+            <button onclick="approveDraft()">Approva bozza</button>
+            <button onclick="rejectDraft()">Rifiuta bozza</button>
+          </div>
+        </div>
+        <pre id="autoOut"></pre>
+      </section>
     </div>
 
     <script>
@@ -182,16 +202,16 @@
         }
       }
 
-      async function callApi(endpoint, inputId, outId) {
+      async function callApi(endpoint, inputId, outId, method = "POST") {
         const out = document.getElementById(outId);
         out.textContent = "Elaborazione...";
         try {
-          const body = JSON.parse(document.getElementById(inputId).value);
+          const body = inputId ? JSON.parse(document.getElementById(inputId).value) : null;
           const url = buildUrl(endpoint);
           const res = await fetch(url, {
-            method: "POST",
+            method,
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(body),
+            body: body ? JSON.stringify(body) : undefined,
           });
           if (!res.ok) {
             const errText = await res.text();
@@ -203,6 +223,56 @@
         } catch (e) {
           const url = buildUrl(endpoint);
           showFetchError(out, e, url);
+        }
+      }
+
+      async function loadAutomationDrafts() {
+        const out = document.getElementById("autoOut");
+        out.textContent = "Caricamento bozze...";
+        try {
+          const res = await fetch(buildUrl("/api/v1/automation/drafts"));
+          const drafts = await res.json();
+          const publishedRes = await fetch(buildUrl("/api/v1/automation/published"));
+          const published = await publishedRes.json();
+          out.textContent = JSON.stringify({ drafts, published }, null, 2);
+        } catch (e) {
+          out.textContent = `Errore caricamento automazione: ${e}`;
+        }
+      }
+
+      async function runAutomation() {
+        const out = document.getElementById("autoOut");
+        out.textContent = "Esecuzione automazione...";
+        try {
+          const res = await fetch(buildUrl("/api/v1/automation/run"), { method: "POST" });
+          const data = await res.json();
+          out.textContent = `Risultato run:\n${JSON.stringify(data, null, 2)}`;
+        } catch (e) {
+          out.textContent = `Errore run automazione: ${e}`;
+        }
+      }
+
+      async function approveDraft() {
+        const id = document.getElementById("draftIdAction").value.trim();
+        if (!id) return;
+        const out = document.getElementById("autoOut");
+        try {
+          const res = await fetch(buildUrl(`/api/v1/automation/drafts/${id}/approve`), { method: "POST" });
+          out.textContent = JSON.stringify(await res.json(), null, 2);
+        } catch (e) {
+          out.textContent = `Errore approvazione: ${e}`;
+        }
+      }
+
+      async function rejectDraft() {
+        const id = document.getElementById("draftIdAction").value.trim();
+        if (!id) return;
+        const out = document.getElementById("autoOut");
+        try {
+          const res = await fetch(buildUrl(`/api/v1/automation/drafts/${id}/reject`), { method: "POST" });
+          out.textContent = JSON.stringify(await res.json(), null, 2);
+        } catch (e) {
+          out.textContent = `Errore rifiuto: ${e}`;
         }
       }
 

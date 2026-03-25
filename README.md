@@ -247,6 +247,26 @@ Nella UI trovi un workflow base:
 > Nota: in questa versione l'invio verso social/WhatsApp è **simulato**.  
 > Per pubblicazione reale servono integrazioni API dedicate (Meta Graph API, WhatsApp Business API, TikTok API, Google Ads API) e gestione token/permessi.
 
+## Versione con automazione completa (operativa)
+
+Flusso disponibile nella UI:
+
+1. Crea bozza contenuto con canale e data/ora (`Automazione completa`).
+2. Approva/Rifiuta bozza (human approval).
+3. Esegui automazione ora oppure lascia il job automatico (ogni 30 secondi).
+4. Controlla storico pubblicazioni.
+
+Endpoint automazione:
+
+- `POST /api/v1/automation/drafts`
+- `GET /api/v1/automation/drafts`
+- `POST /api/v1/automation/drafts/{draft_id}/approve`
+- `POST /api/v1/automation/drafts/{draft_id}/reject`
+- `POST /api/v1/automation/run`
+- `GET /api/v1/automation/published`
+
+Il sistema salva stato in `data/automation_state.json`.
+
 ## Endpoint principali
 
 - `POST /api/v1/strategy/generate` → genera strategia marketing mensile.
