@@ -171,6 +171,10 @@ Nelle card dedicate:
 
 compila i campi richiesti e clicca i pulsanti “Genera…”.
 
+Per **post** e **campagne ADS** puoi indicare direttamente gli **argomenti** desiderati
+(es. “meditazione, gestione stress, sonno”) nel campo dedicato:
+non serve intervenire su JSON.
+
 ### Fase B — Workflow pubblicazione
 
 1. Vai in **Automazione completa**.

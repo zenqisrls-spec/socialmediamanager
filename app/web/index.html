@@ -132,7 +132,7 @@
           <label>Budget mensile (€)</label>
           <input id="strBudget" type="number" value="1200" />
           <div class="actions"><button onclick="generateStrategy()">Genera strategia</button></div>
-          <pre id="strOut"></pre>
+          <div id="strOut" class="hint"></div>
         </section>
 
         <section class="card">
@@ -143,8 +143,10 @@
           <input id="cntGoals" value="awareness,lead_generation" />
           <label>Post a settimana</label>
           <input id="cntPosts" type="number" value="4" />
+          <label>Argomenti dei post (separati da virgola)</label>
+          <input id="cntTopics" placeholder="es: meditazione, sonno, respirazione" />
           <div class="actions"><button onclick="generateContent()">Genera post</button></div>
-          <pre id="cntOut"></pre>
+          <div id="cntOut" class="hint"></div>
         </section>
 
         <section class="card">
@@ -153,8 +155,10 @@
           <input id="adsGoals" value="lead_generation" />
           <label>Budget mensile (€)</label>
           <input id="adsBudget" type="number" value="1500" />
+          <label>Argomenti campagne (separati da virgola)</label>
+          <input id="adsTopics" placeholder="es: gestione stress, percorsi detox" />
           <div class="actions"><button onclick="generateAds()">Genera campagne</button></div>
-          <pre id="adsOut"></pre>
+          <div id="adsOut" class="hint"></div>
         </section>
 
         <section class="card">
@@ -216,6 +220,7 @@
 
       function show(outId, data) { $(outId).textContent = JSON.stringify(data, null, 2); }
       function showErr(outId, e) { $(outId).textContent = `Errore: ${e}`; }
+      function showHtml(outId, html) { $(outId).innerHTML = html; }
 
       async function login() {
         $("loginStatus").textContent = "Accesso in corso...";
@@ -273,7 +278,13 @@
             goals: [$("strGoal").value],
             monthly_budget_eur: Number($("strBudget").value || 0)
           };
-          show("strOut", await api("/api/v1/strategy/generate", "POST", payload));
+          const data = await api("/api/v1/strategy/generate", "POST", payload);
+          showHtml("strOut", `
+            <strong>Posizionamento:</strong> ${data.strategic_positioning}<br/><br/>
+            <strong>Pilastri mensili:</strong><ul>${data.monthly_pillars.map(p => `<li>${p}</li>`).join("")}</ul>
+            <strong>KPI consigliati:</strong><ul>${data.kpis.map(k => `<li>${k}</li>`).join("")}</ul>
+            <strong>Funnel offerta:</strong><ul>${data.offer_funnel.map(f => `<li>${f}</li>`).join("")}</ul>
+          `);
         } catch (e) { showErr("strOut", e); }
       }
 
@@ -282,9 +293,21 @@
           const payload = {
             goals: splitCsv($("cntGoals").value),
             channels: splitCsv($("cntChannels").value),
-            posts_per_week: Number($("cntPosts").value || 4)
+            posts_per_week: Number($("cntPosts").value || 4),
+            topics: splitCsv($("cntTopics").value)
           };
-          show("cntOut", await api("/api/v1/content/generate-posts", "POST", payload));
+          const data = await api("/api/v1/content/generate-posts", "POST", payload);
+          showHtml("cntOut",
+            data.post_ideas.map((p, i) => `
+              <div style="background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:8px;margin-bottom:8px;">
+                <strong>Post ${i + 1} — ${p.channel.toUpperCase()} (${p.content_type})</strong><br/>
+                <em>Obiettivo:</em> ${p.objective}<br/>
+                <em>Hook:</em> ${p.hook}<br/>
+                <em>Testo:</em> ${p.caption}<br/>
+                <em>CTA:</em> ${p.call_to_action}
+              </div>
+            `).join("")
+          );
         } catch (e) { showErr("cntOut", e); }
       }
 
@@ -292,9 +315,23 @@
         try {
           const payload = {
             goals: splitCsv($("adsGoals").value),
-            monthly_budget_eur: Number($("adsBudget").value || 0)
+            monthly_budget_eur: Number($("adsBudget").value || 0),
+            topics: splitCsv($("adsTopics").value)
           };
-          show("adsOut", await api("/api/v1/ads/generate-campaigns", "POST", payload));
+          const data = await api("/api/v1/ads/generate-campaigns", "POST", payload);
+          showHtml("adsOut",
+            data.campaigns.map((c, i) => `
+              <div style="background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:8px;margin-bottom:8px;">
+                <strong>Campagna ${i + 1} — ${c.platform}</strong><br/>
+                <em>Nome:</em> ${c.campaign_name}<br/>
+                <em>Obiettivo:</em> ${c.objective}<br/>
+                <em>Target:</em> ${c.target_audience}<br/>
+                <em>Budget giornaliero:</em> € ${c.daily_budget_eur}<br/>
+                <em>Messaggio:</em> ${c.ad_copy}<br/>
+                <em>KPI:</em> ${c.kpi_target}
+              </div>
+            `).join("")
+          );
         } catch (e) { showErr("adsOut", e); }
       }
 

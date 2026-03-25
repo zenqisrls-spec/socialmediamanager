@@ -38,6 +38,7 @@ class ContentRequest(BaseModel):
     goals: list[GoalType]
     channels: list[SocialChannel]
     posts_per_week: int = Field(default=4, ge=1, le=14)
+    topics: list[str] = Field(default_factory=list)
     tone_of_voice: str = Field(default="Empatico, autorevole, rassicurante")
     context: BusinessContext = Field(default_factory=BusinessContext)
 
@@ -58,6 +59,7 @@ class ContentResponse(BaseModel):
 class AdsRequest(BaseModel):
     goals: list[GoalType]
     monthly_budget_eur: float = Field(default=1200, ge=100)
+    topics: list[str] = Field(default_factory=list)
     context: BusinessContext = Field(default_factory=BusinessContext)
 
 

@@ -69,15 +69,17 @@ class MarketingService:
     def generate_posts(self, payload: ContentRequest) -> ContentResponse:
         fallback_posts = []
         content_types = ["reel", "carousel", "stories", "post statico", "live teaser"]
+        topics = payload.topics or ["benessere olistico", "gestione dello stress", "energia quotidiana"]
         for idx in range(payload.posts_per_week):
             channel = payload.channels[idx % len(payload.channels)]
             goal = payload.goals[idx % len(payload.goals)]
+            topic = topics[idx % len(topics)]
             fallback_posts.append(
                 {
                     "channel": channel,
                     "content_type": content_types[idx % len(content_types)],
-                    "hook": f"3 segnali che il tuo corpo ti sta chiedendo equilibrio ({idx + 1})",
-                    "caption": "Scopri una pratica semplice da inserire oggi per ridurre stress e ritrovare energia.",
+                    "hook": f"{topic.title()}: 3 segnali da non ignorare ({idx + 1})",
+                    "caption": f"Scopri una pratica semplice su '{topic}' da inserire oggi per ridurre stress e ritrovare energia.",
                     "call_to_action": "Prenota la tua consulenza olistica su zenqi.it",
                     "objective": goal,
                 }
@@ -94,6 +96,7 @@ class MarketingService:
 
     def generate_campaigns(self, payload: AdsRequest) -> AdsResponse:
         daily_budget = round(payload.monthly_budget_eur / 30, 2)
+        campaign_topic = payload.topics[0] if payload.topics else "benessere olistico personalizzato"
         fallback = {
             "campaigns": [
                 {
@@ -102,7 +105,7 @@ class MarketingService:
                     "objective": "Lead generation",
                     "target_audience": "Donne e uomini 28-55 interessati a yoga, mindfulness, benessere naturale in area Roma",
                     "daily_budget_eur": daily_budget,
-                    "ad_copy": "Ritrova equilibrio e benessere con un percorso personalizzato ZenQi.",
+                    "ad_copy": f"Ritrova equilibrio e benessere con un percorso personalizzato ZenQi su: {campaign_topic}.",
                     "creative_direction": "Video breve con testimonianza + scene ambiente del centro",
                     "kpi_target": "Costo per lead < 12 EUR",
                 },
@@ -112,7 +115,7 @@ class MarketingService:
                     "objective": "Conversione prenotazioni",
                     "target_audience": "Persone che cercano trattamenti olistici e riduzione stress a Roma",
                     "daily_budget_eur": daily_budget,
-                    "ad_copy": "Centro olistico a Roma: percorsi su misura per stress, energia e benessere.",
+                    "ad_copy": f"Centro olistico a Roma: percorsi su misura su {campaign_topic}.",
                     "creative_direction": "Annunci search con estensioni call e sitelink",
                     "kpi_target": "Tasso conversione landing > 6%",
                 },
