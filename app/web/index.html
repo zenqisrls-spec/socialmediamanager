@@ -1,0 +1,439 @@
+<!doctype html>
+<html lang="it">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ZenQi Social Media Manager</title>
+    <style>
+      :root {
+        --bg: #f5f7fb;
+        --card: #ffffff;
+        --text: #1f2937;
+        --muted: #6b7280;
+        --primary: #2563eb;
+        --ok: #059669;
+        --err: #dc2626;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0; padding: 24px;
+        font-family: "Segoe UI", Arial, sans-serif;
+        background: var(--bg); color: var(--text);
+      }
+      .wrap { max-width: 1200px; margin: 0 auto; }
+      .hero {
+        background: linear-gradient(135deg, #1d4ed8, #2563eb);
+        color: white; border-radius: 16px; padding: 18px 20px; margin-bottom: 18px;
+      }
+      .hero h1 { margin: 0 0 6px; font-size: 1.5rem; }
+      .hero p { margin: 0; opacity: .95; }
+      .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; }
+      .card {
+        background: var(--card); border-radius: 14px; padding: 14px;
+        box-shadow: 0 4px 14px rgba(31,41,55,.08);
+      }
+      .card h3 { margin: 0 0 10px; font-size: 1.05rem; }
+      label { font-size: .9rem; color: var(--muted); display: block; margin-top: 8px; }
+      input, select, textarea {
+        width: 100%; border: 1px solid #d1d5db; border-radius: 10px; padding: 8px;
+        margin-top: 4px; font-size: .95rem; background: #fff;
+      }
+      textarea { min-height: 90px; resize: vertical; }
+      .row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+      .actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+      button {
+        border: none; border-radius: 10px; padding: 9px 12px;
+        background: var(--primary); color: #fff; cursor: pointer; font-weight: 600;
+      }
+      button.secondary { background: #4b5563; }
+      button.ghost { background: #e5e7eb; color: #111827; }
+      .status { font-size: .88rem; margin-top: 8px; }
+      .ok { color: var(--ok); }
+      .err { color: var(--err); }
+      pre {
+        background: #0f172a; color: #e2e8f0;
+        border-radius: 10px; padding: 10px; overflow: auto; max-height: 260px;
+      }
+      .hint { color: var(--muted); font-size: .9rem; margin: 6px 0 0; }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div class="hero">
+        <h1>ZenQi Social Media Manager</h1>
+        <p>Versione semplificata per utenti non tecnici: form guidati, workflow chiaro e risultati leggibili.</p>
+      </div>
+
+      <div class="card" style="margin-bottom: 16px;">
+        <h3>1) Connessione e login</h3>
+        <label>URL applicazione</label>
+        <input id="apiBase" />
+        <div class="row" style="grid-template-columns: 1fr 1fr auto; margin-top:8px;">
+          <div><label>Utente</label><input id="loginUser" placeholder="admin / approver / editor" /></div>
+          <div><label>Password</label><input id="loginPass" type="password" placeholder="admin123 / approver123 / editor123" /></div>
+          <div style="display:flex; align-items:end;"><button onclick="login()">Accedi</button></div>
+        </div>
+        <div id="loginStatus" class="status"></div>
+        <div id="aiStatus" class="status"></div>
+      </div>
+
+      <div class="grid">
+        <section class="card">
+          <h3>Profilo Centro (personalizzazione)</h3>
+          <label>Nome centro</label>
+          <input id="ctxBrand" value="ZenQi SRLS" />
+          <label>Sito web</label>
+          <input id="ctxWebsite" value="https://zenqi.it" />
+          <label>Settore</label>
+          <input id="ctxIndustry" value="Centro olistico" />
+          <label>Città / zona</label>
+          <input id="ctxCity" value="Toscana" />
+          <label>Valore distintivo</label>
+          <textarea id="ctxValue">Percorsi olistici personalizzati per benessere fisico, mentale ed energetico</textarea>
+          <p class="hint">Questi dati verranno usati per personalizzare strategie, post e campagne.</p>
+        </section>
+
+        <section class="card">
+          <h3>2) Configurazione generale</h3>
+          <label>OpenAI API Key (facoltativa)</label>
+          <input id="cfgApiKey" type="password" />
+          <label>Modello AI</label>
+          <input id="cfgModel" value="gpt-4.1-mini" />
+          <label><input id="cfgApproval" type="checkbox" checked /> Richiedi approvazione umana</label>
+          <label><input id="cfgAutopublish" type="checkbox" /> Abilita autopubblicazione</label>
+          <label><input id="cfgWhatsapp" type="checkbox" /> Abilita WhatsApp</label>
+          <p class="hint">Per pubblicazione reale compila anche i campi integrazioni.</p>
+          <div class="actions">
+            <button class="secondary" onclick="loadConfig()">Carica configurazione</button>
+            <button onclick="saveConfig()">Salva configurazione</button>
+          </div>
+          <div id="cfgOut" class="hint"></div>
+        </section>
+
+        <section class="card">
+          <h3>3) Integrazioni piattaforme</h3>
+          <label>Meta Access Token</label>
+          <input id="cfgMetaToken" type="password" />
+          <label>Meta Page ID</label>
+          <input id="cfgMetaPageId" />
+          <label>WhatsApp Token</label>
+          <input id="cfgWaToken" type="password" />
+          <label>WhatsApp Phone Number ID</label>
+          <input id="cfgWaPhoneId" />
+          <label>Numero destinatario WhatsApp</label>
+          <input id="cfgWaTo" placeholder="es: 393331234567" />
+          <p class="hint">Questi dati vengono salvati quando premi “Salva configurazione”.</p>
+        </section>
+
+        <section class="card">
+          <h3>4) Genera strategia marketing</h3>
+          <label>Obiettivo principale</label>
+          <select id="strGoal">
+            <option value="awareness">Awareness (visibilità)</option>
+            <option value="lead_generation">Lead generation (contatti)</option>
+            <option value="retention">Retention (fidelizzazione)</option>
+          </select>
+          <label>Budget mensile (€)</label>
+          <input id="strBudget" type="number" value="1200" />
+          <div class="actions"><button onclick="generateStrategy()">Genera strategia</button></div>
+          <div id="strOut" class="hint"></div>
+        </section>
+
+        <section class="card">
+          <h3>5) Genera contenuti social</h3>
+          <label>Canali (separati da virgola)</label>
+          <input id="cntChannels" value="instagram,facebook" />
+          <label>Obiettivi (separati da virgola)</label>
+          <input id="cntGoals" value="awareness,lead_generation" />
+          <label>Post a settimana</label>
+          <input id="cntPosts" type="number" value="4" />
+          <label>Argomenti dei post (separati da virgola)</label>
+          <input id="cntTopics" placeholder="es: meditazione, sonno, respirazione" />
+          <div class="actions"><button onclick="generateContent()">Genera post</button></div>
+          <div id="cntOut" class="hint"></div>
+        </section>
+
+        <section class="card">
+          <h3>6) Genera campagne ADS</h3>
+          <label>Obiettivi (separati da virgola)</label>
+          <input id="adsGoals" value="lead_generation" />
+          <label>Budget mensile (€)</label>
+          <input id="adsBudget" type="number" value="1500" />
+          <label>Argomenti campagne (separati da virgola)</label>
+          <input id="adsTopics" placeholder="es: gestione stress, percorsi detox" />
+          <div class="actions"><button onclick="generateAds()">Genera campagne</button></div>
+          <div id="adsOut" class="hint"></div>
+        </section>
+
+        <section class="card">
+          <h3>7) Crea bozza automazione</h3>
+          <label>Canale</label>
+          <select id="autoChannel">
+            <option>instagram</option><option>facebook</option><option>whatsapp</option><option>tiktok</option>
+          </select>
+          <label>Contenuto</label>
+          <textarea id="autoContent">Post automatico ZenQi del giorno.</textarea>
+          <label>Data/Ora pubblicazione (ISO UTC, opzionale)</label>
+          <input id="autoWhen" placeholder="2026-03-25T10:00:00+00:00" />
+          <div class="actions">
+            <button onclick="createDraft()">Crea bozza</button>
+            <button class="secondary" onclick="loadDrafts()">Aggiorna bozze</button>
+          </div>
+          <div id="autoOut" class="hint"></div>
+        </section>
+
+        <section class="card">
+          <h3>8) Approvazione e run</h3>
+          <label>ID bozza</label>
+          <input id="draftIdAction" placeholder="Incolla ID bozza da approvare/rifiutare" />
+          <div class="actions">
+            <button onclick="approveDraft()">Approva</button>
+            <button class="secondary" onclick="rejectDraft()">Rifiuta</button>
+            <button class="ghost" onclick="runAutomation()">Esegui automazione ora</button>
+          </div>
+          <div id="runOut" class="hint"></div>
+        </section>
+
+        <section class="card">
+          <h3>9) Dashboard KPI</h3>
+          <div class="actions"><button class="secondary" onclick="loadDashboard()">Aggiorna KPI</button></div>
+          <div id="dashOut" class="hint"></div>
+        </section>
+      </div>
+    </div>
+
+    <script>
+      let authToken = "";
+      const $ = (id) => document.getElementById(id);
+      const splitCsv = (v) => v.split(",").map(x => x.trim()).filter(Boolean);
+      const baseUrl = () => $("apiBase").value.replace(/\/$/, "");
+      const authHeaders = () => authToken ? { "Authorization": `Bearer ${authToken}` } : {};
+      const getContext = () => ({
+        brand_name: $("ctxBrand").value,
+        website: $("ctxWebsite").value,
+        industry: $("ctxIndustry").value,
+        city: $("ctxCity").value,
+        unique_value: $("ctxValue").value
+      });
+
+      async function api(path, method = "GET", body = null) {
+        const headers = { ...authHeaders() };
+        if (body !== null) headers["Content-Type"] = "application/json";
+        const res = await fetch(`${baseUrl()}${path}`, {
+          method, headers, body: body !== null ? JSON.stringify(body) : undefined
+        });
+        const txt = await res.text();
+        let data;
+        try { data = txt ? JSON.parse(txt) : {}; } catch { data = { raw: txt }; }
+        if (!res.ok) throw new Error(`${res.status} - ${JSON.stringify(data)}`);
+        return data;
+      }
+
+      function show(outId, data) { $(outId).textContent = JSON.stringify(data, null, 2); }
+      function showErr(outId, e) { $(outId).textContent = `Errore: ${e}`; }
+      function showHtml(outId, html) { $(outId).innerHTML = html; }
+
+      async function login() {
+        $("loginStatus").textContent = "Accesso in corso...";
+        try {
+          const data = await api("/api/v1/auth/login", "POST", {
+            username: $("loginUser").value, password: $("loginPass").value
+          });
+          authToken = data.access_token;
+          $("loginStatus").innerHTML = `<span class="ok">Accesso riuscito</span> (ruolo: ${data.role})`;
+          await loadConfig();
+          await loadAIStatus();
+          await loadDashboard();
+        } catch (e) {
+          $("loginStatus").innerHTML = `<span class="err">Accesso fallito:</span> ${e}`;
+        }
+      }
+
+      async function loadConfig() {
+        try {
+          const cfg = await api("/api/v1/config");
+          $("cfgApiKey").value = cfg.openai_api_key || "";
+          $("cfgModel").value = cfg.model_name || "gpt-4.1-mini";
+          $("cfgApproval").checked = !!cfg.require_human_approval;
+          $("cfgAutopublish").checked = !!cfg.autopublish_enabled;
+          $("cfgWhatsapp").checked = !!cfg.whatsapp_enabled;
+          $("cfgMetaToken").value = cfg.meta_access_token || "";
+          $("cfgMetaPageId").value = cfg.meta_page_id || "";
+          $("cfgWaToken").value = cfg.whatsapp_token || "";
+          $("cfgWaPhoneId").value = cfg.whatsapp_phone_number_id || "";
+          $("cfgWaTo").value = cfg.whatsapp_to || "";
+          showHtml("cfgOut", `
+            <strong>Configurazione caricata.</strong><br/>
+            Modello AI: <strong>${cfg.model_name}</strong><br/>
+            Approvazione umana: <strong>${cfg.require_human_approval ? "Attiva" : "Disattiva"}</strong><br/>
+            Autopubblicazione: <strong>${cfg.autopublish_enabled ? "Attiva" : "Disattiva"}</strong>
+          `);
+        } catch (e) { showErr("cfgOut", e); }
+      }
+
+      async function saveConfig() {
+        try {
+          const payload = {
+            openai_api_key: $("cfgApiKey").value,
+            model_name: $("cfgModel").value,
+            require_human_approval: $("cfgApproval").checked,
+            autopublish_enabled: $("cfgAutopublish").checked,
+            whatsapp_enabled: $("cfgWhatsapp").checked,
+            meta_access_token: $("cfgMetaToken").value,
+            meta_page_id: $("cfgMetaPageId").value,
+            whatsapp_token: $("cfgWaToken").value,
+            whatsapp_phone_number_id: $("cfgWaPhoneId").value,
+            whatsapp_to: $("cfgWaTo").value
+          };
+          const result = await api("/api/v1/config", "PUT", payload);
+          showHtml("cfgOut", `<span class="ok">Configurazione salvata con successo.</span><br/>Modello: <strong>${result.model_name}</strong>`);
+          await loadAIStatus();
+        } catch (e) { showErr("cfgOut", e); }
+      }
+
+      async function loadAIStatus() {
+        try {
+          const s = await api("/api/v1/ai/status");
+          const statusText = s.api_key_configured && s.openai_package_available
+            ? `<span class="ok">AI attiva</span>: i contenuti possono essere generati da OpenAI.`
+            : `<span class="err">AI fallback</span>: mancano API key o pacchetto openai.`;
+          $("aiStatus").innerHTML = statusText;
+        } catch (e) {
+          $("aiStatus").textContent = `Errore stato AI: ${e}`;
+        }
+      }
+
+      async function generateStrategy() {
+        try {
+          const payload = {
+            goals: [$("strGoal").value],
+            monthly_budget_eur: Number($("strBudget").value || 0),
+            context: getContext()
+          };
+          const data = await api("/api/v1/strategy/generate", "POST", payload);
+          showHtml("strOut", `
+            <strong>Posizionamento:</strong> ${data.strategic_positioning}<br/><br/>
+            <strong>Pilastri mensili:</strong><ul>${data.monthly_pillars.map(p => `<li>${p}</li>`).join("")}</ul>
+            <strong>KPI consigliati:</strong><ul>${data.kpis.map(k => `<li>${k}</li>`).join("")}</ul>
+            <strong>Funnel offerta:</strong><ul>${data.offer_funnel.map(f => `<li>${f}</li>`).join("")}</ul>
+          `);
+        } catch (e) { showErr("strOut", e); }
+      }
+
+      async function generateContent() {
+        try {
+          const payload = {
+            goals: splitCsv($("cntGoals").value),
+            channels: splitCsv($("cntChannels").value),
+            posts_per_week: Number($("cntPosts").value || 4),
+            topics: splitCsv($("cntTopics").value),
+            context: getContext()
+          };
+          const data = await api("/api/v1/content/generate-posts", "POST", payload);
+          showHtml("cntOut",
+            data.post_ideas.map((p, i) => `
+              <div style="background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:8px;margin-bottom:8px;">
+                <strong>Post ${i + 1} — ${p.channel.toUpperCase()} (${p.content_type})</strong><br/>
+                <em>Obiettivo:</em> ${p.objective}<br/>
+                <em>Hook:</em> ${p.hook}<br/>
+                <em>Testo:</em> ${p.caption}<br/>
+                <em>CTA:</em> ${p.call_to_action}
+              </div>
+            `).join("")
+          );
+        } catch (e) { showErr("cntOut", e); }
+      }
+
+      async function generateAds() {
+        try {
+          const payload = {
+            goals: splitCsv($("adsGoals").value),
+            monthly_budget_eur: Number($("adsBudget").value || 0),
+            topics: splitCsv($("adsTopics").value),
+            context: getContext()
+          };
+          const data = await api("/api/v1/ads/generate-campaigns", "POST", payload);
+          showHtml("adsOut",
+            data.campaigns.map((c, i) => `
+              <div style="background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:8px;margin-bottom:8px;">
+                <strong>Campagna ${i + 1} — ${c.platform}</strong><br/>
+                <em>Nome:</em> ${c.campaign_name}<br/>
+                <em>Obiettivo:</em> ${c.objective}<br/>
+                <em>Target:</em> ${c.target_audience}<br/>
+                <em>Budget giornaliero:</em> € ${c.daily_budget_eur}<br/>
+                <em>Messaggio:</em> ${c.ad_copy}<br/>
+                <em>KPI:</em> ${c.kpi_target}
+              </div>
+            `).join("")
+          );
+        } catch (e) { showErr("adsOut", e); }
+      }
+
+      async function createDraft() {
+        try {
+          const payload = {
+            channel: $("autoChannel").value,
+            content: $("autoContent").value,
+            scheduled_for: $("autoWhen").value || null
+          };
+          show("autoOut", await api("/api/v1/automation/drafts", "POST", payload));
+        } catch (e) { showErr("autoOut", e); }
+      }
+
+      async function loadDrafts() {
+        try {
+          const drafts = await api("/api/v1/automation/drafts");
+          const published = await api("/api/v1/automation/published");
+          showHtml("autoOut", `
+            <strong>Bozze attive:</strong> ${drafts.length}<br/>
+            <strong>Pubblicazioni storiche:</strong> ${published.length}<br/>
+            <small>Clicca una bozza e copia l'ID nel campo approvazione.</small>
+            <pre>${JSON.stringify(drafts.slice(0, 5), null, 2)}</pre>
+          `);
+        } catch (e) { showErr("autoOut", e); }
+      }
+
+      async function approveDraft() {
+        try { show("runOut", await api(`/api/v1/automation/drafts/${$("draftIdAction").value}/approve`, "POST")); }
+        catch (e) { showErr("runOut", e); }
+      }
+      async function rejectDraft() {
+        try { show("runOut", await api(`/api/v1/automation/drafts/${$("draftIdAction").value}/reject`, "POST")); }
+        catch (e) { showErr("runOut", e); }
+      }
+      async function runAutomation() {
+        try {
+          const result = await api("/api/v1/automation/run", "POST");
+          showHtml("runOut", `
+            <strong>Automazione eseguita.</strong><br/>
+            Processati: <strong>${result.processed}</strong><br/>
+            Pubblicati: <strong>${result.published}</strong><br/>
+            Falliti: <strong>${result.failed}</strong>
+          `);
+        }
+        catch (e) { showErr("runOut", e); }
+      }
+      async function loadDashboard() {
+        try {
+          const d = await api("/api/v1/dashboard/summary");
+          showHtml("dashOut", `
+            <strong>Bozze totali:</strong> ${d.drafts_total}<br/>
+            <strong>Pubblicazioni totali:</strong> ${d.published_total}<br/>
+            <strong>Pubblicazioni riuscite:</strong> ${d.published_ok}<br/>
+            <strong>Pubblicazioni fallite:</strong> ${d.published_failed}<br/>
+            <small>Dettaglio stato:</small>
+            <pre>${JSON.stringify(d.drafts_by_status, null, 2)}</pre>
+          `);
+        }
+        catch (e) { showErr("dashOut", e); }
+      }
+
+      (function init() {
+        $("apiBase").value = window.location.protocol.startsWith("http")
+          ? window.location.origin
+          : "http://127.0.0.1:8000";
+        loadAIStatus();
+      })();
+    </script>
+  </body>
+</html>
