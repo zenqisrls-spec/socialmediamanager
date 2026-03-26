@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import importlib.util
 import os
 from typing import Any
 
@@ -42,3 +43,9 @@ class AIService:
             return json.loads(content)
         except Exception:
             return fallback
+
+    def status(self) -> dict[str, bool]:
+        return {
+            "api_key_configured": bool(self.api_key),
+            "openai_package_available": importlib.util.find_spec("openai") is not None,
+        }

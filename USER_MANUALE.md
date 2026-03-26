@@ -144,6 +144,16 @@ Nella UI, sezione **Configurazioni (no-code)**:
 2. Compila i campi necessari.
 3. Clicca **Salva config**.
 
+Prima di generare contenuti, compila anche il blocco **Profilo Centro (personalizzazione)**:
+
+- nome centro,
+- sito,
+- settore,
+- città/zona,
+- valore distintivo.
+
+In questo modo post e campagne risultano personalizzati (es. Toscana invece di Roma).
+
 Campi importanti:
 
 - `OpenAI API Key` (facoltativa)

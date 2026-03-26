@@ -173,3 +173,8 @@ class AuditLogItem(BaseModel):
     username: str
     action: str
     details: str
+
+
+class AIStatus(BaseModel):
+    api_key_configured: bool
+    openai_package_available: bool

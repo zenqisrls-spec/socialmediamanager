@@ -20,6 +20,7 @@ from app.schemas import (
     AutomationRunResponse,
     DashboardSummary,
     AuditLogItem,
+    AIStatus,
     LoginRequest,
     LoginResponse,
     PublishedItem,
@@ -74,6 +75,11 @@ def web_ui() -> FileResponse:
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@app.get("/api/v1/ai/status", response_model=AIStatus)
+def ai_status() -> AIStatus:
+    return AIStatus(**service.ai.status())
 
 
 @app.post("/api/v1/auth/login", response_model=LoginResponse)

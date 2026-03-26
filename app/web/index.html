@@ -66,29 +66,33 @@
 
       <div class="card" style="margin-bottom: 16px;">
         <h3>1) Connessione e login</h3>
-        <div class="row">
-          <div>
-            <label>URL applicazione</label>
-            <input id="apiBase" />
-          </div>
-          <div>
-            <label>Utente</label>
-            <input id="loginUser" placeholder="admin / approver / editor" />
-          </div>
-        </div>
-        <div class="row">
-          <div>
-            <label>Password</label>
-            <input id="loginPass" type="password" placeholder="admin123 / approver123 / editor123" />
-          </div>
-          <div style="display:flex;align-items:end;">
-            <button onclick="login()">Accedi</button>
-          </div>
+        <label>URL applicazione</label>
+        <input id="apiBase" />
+        <div class="row" style="grid-template-columns: 1fr 1fr auto; margin-top:8px;">
+          <div><label>Utente</label><input id="loginUser" placeholder="admin / approver / editor" /></div>
+          <div><label>Password</label><input id="loginPass" type="password" placeholder="admin123 / approver123 / editor123" /></div>
+          <div style="display:flex; align-items:end;"><button onclick="login()">Accedi</button></div>
         </div>
         <div id="loginStatus" class="status"></div>
+        <div id="aiStatus" class="status"></div>
       </div>
 
       <div class="grid">
+        <section class="card">
+          <h3>Profilo Centro (personalizzazione)</h3>
+          <label>Nome centro</label>
+          <input id="ctxBrand" value="ZenQi SRLS" />
+          <label>Sito web</label>
+          <input id="ctxWebsite" value="https://zenqi.it" />
+          <label>Settore</label>
+          <input id="ctxIndustry" value="Centro olistico" />
+          <label>Città / zona</label>
+          <input id="ctxCity" value="Toscana" />
+          <label>Valore distintivo</label>
+          <textarea id="ctxValue">Percorsi olistici personalizzati per benessere fisico, mentale ed energetico</textarea>
+          <p class="hint">Questi dati verranno usati per personalizzare strategie, post e campagne.</p>
+        </section>
+
         <section class="card">
           <h3>2) Configurazione generale</h3>
           <label>OpenAI API Key (facoltativa)</label>
@@ -103,7 +107,7 @@
             <button class="secondary" onclick="loadConfig()">Carica configurazione</button>
             <button onclick="saveConfig()">Salva configurazione</button>
           </div>
-          <pre id="cfgOut"></pre>
+          <div id="cfgOut" class="hint"></div>
         </section>
 
         <section class="card">
@@ -175,7 +179,7 @@
             <button onclick="createDraft()">Crea bozza</button>
             <button class="secondary" onclick="loadDrafts()">Aggiorna bozze</button>
           </div>
-          <pre id="autoOut"></pre>
+          <div id="autoOut" class="hint"></div>
         </section>
 
         <section class="card">
@@ -187,13 +191,13 @@
             <button class="secondary" onclick="rejectDraft()">Rifiuta</button>
             <button class="ghost" onclick="runAutomation()">Esegui automazione ora</button>
           </div>
-          <pre id="runOut"></pre>
+          <div id="runOut" class="hint"></div>
         </section>
 
         <section class="card">
           <h3>9) Dashboard KPI</h3>
           <div class="actions"><button class="secondary" onclick="loadDashboard()">Aggiorna KPI</button></div>
-          <pre id="dashOut"></pre>
+          <div id="dashOut" class="hint"></div>
         </section>
       </div>
     </div>
@@ -204,6 +208,13 @@
       const splitCsv = (v) => v.split(",").map(x => x.trim()).filter(Boolean);
       const baseUrl = () => $("apiBase").value.replace(/\/$/, "");
       const authHeaders = () => authToken ? { "Authorization": `Bearer ${authToken}` } : {};
+      const getContext = () => ({
+        brand_name: $("ctxBrand").value,
+        website: $("ctxWebsite").value,
+        industry: $("ctxIndustry").value,
+        city: $("ctxCity").value,
+        unique_value: $("ctxValue").value
+      });
 
       async function api(path, method = "GET", body = null) {
         const headers = { ...authHeaders() };
@@ -231,6 +242,7 @@
           authToken = data.access_token;
           $("loginStatus").innerHTML = `<span class="ok">Accesso riuscito</span> (ruolo: ${data.role})`;
           await loadConfig();
+          await loadAIStatus();
           await loadDashboard();
         } catch (e) {
           $("loginStatus").innerHTML = `<span class="err">Accesso fallito:</span> ${e}`;
@@ -250,7 +262,12 @@
           $("cfgWaToken").value = cfg.whatsapp_token || "";
           $("cfgWaPhoneId").value = cfg.whatsapp_phone_number_id || "";
           $("cfgWaTo").value = cfg.whatsapp_to || "";
-          show("cfgOut", cfg);
+          showHtml("cfgOut", `
+            <strong>Configurazione caricata.</strong><br/>
+            Modello AI: <strong>${cfg.model_name}</strong><br/>
+            Approvazione umana: <strong>${cfg.require_human_approval ? "Attiva" : "Disattiva"}</strong><br/>
+            Autopubblicazione: <strong>${cfg.autopublish_enabled ? "Attiva" : "Disattiva"}</strong>
+          `);
         } catch (e) { showErr("cfgOut", e); }
       }
 
@@ -268,15 +285,30 @@
             whatsapp_phone_number_id: $("cfgWaPhoneId").value,
             whatsapp_to: $("cfgWaTo").value
           };
-          show("cfgOut", await api("/api/v1/config", "PUT", payload));
+          const result = await api("/api/v1/config", "PUT", payload);
+          showHtml("cfgOut", `<span class="ok">Configurazione salvata con successo.</span><br/>Modello: <strong>${result.model_name}</strong>`);
+          await loadAIStatus();
         } catch (e) { showErr("cfgOut", e); }
+      }
+
+      async function loadAIStatus() {
+        try {
+          const s = await api("/api/v1/ai/status");
+          const statusText = s.api_key_configured && s.openai_package_available
+            ? `<span class="ok">AI attiva</span>: i contenuti possono essere generati da OpenAI.`
+            : `<span class="err">AI fallback</span>: mancano API key o pacchetto openai.`;
+          $("aiStatus").innerHTML = statusText;
+        } catch (e) {
+          $("aiStatus").textContent = `Errore stato AI: ${e}`;
+        }
       }
 
       async function generateStrategy() {
         try {
           const payload = {
             goals: [$("strGoal").value],
-            monthly_budget_eur: Number($("strBudget").value || 0)
+            monthly_budget_eur: Number($("strBudget").value || 0),
+            context: getContext()
           };
           const data = await api("/api/v1/strategy/generate", "POST", payload);
           showHtml("strOut", `
@@ -294,7 +326,8 @@
             goals: splitCsv($("cntGoals").value),
             channels: splitCsv($("cntChannels").value),
             posts_per_week: Number($("cntPosts").value || 4),
-            topics: splitCsv($("cntTopics").value)
+            topics: splitCsv($("cntTopics").value),
+            context: getContext()
           };
           const data = await api("/api/v1/content/generate-posts", "POST", payload);
           showHtml("cntOut",
@@ -316,7 +349,8 @@
           const payload = {
             goals: splitCsv($("adsGoals").value),
             monthly_budget_eur: Number($("adsBudget").value || 0),
-            topics: splitCsv($("adsTopics").value)
+            topics: splitCsv($("adsTopics").value),
+            context: getContext()
           };
           const data = await api("/api/v1/ads/generate-campaigns", "POST", payload);
           showHtml("adsOut",
@@ -350,7 +384,12 @@
         try {
           const drafts = await api("/api/v1/automation/drafts");
           const published = await api("/api/v1/automation/published");
-          show("autoOut", { drafts, published });
+          showHtml("autoOut", `
+            <strong>Bozze attive:</strong> ${drafts.length}<br/>
+            <strong>Pubblicazioni storiche:</strong> ${published.length}<br/>
+            <small>Clicca una bozza e copia l'ID nel campo approvazione.</small>
+            <pre>${JSON.stringify(drafts.slice(0, 5), null, 2)}</pre>
+          `);
         } catch (e) { showErr("autoOut", e); }
       }
 
@@ -363,11 +402,29 @@
         catch (e) { showErr("runOut", e); }
       }
       async function runAutomation() {
-        try { show("runOut", await api("/api/v1/automation/run", "POST")); }
+        try {
+          const result = await api("/api/v1/automation/run", "POST");
+          showHtml("runOut", `
+            <strong>Automazione eseguita.</strong><br/>
+            Processati: <strong>${result.processed}</strong><br/>
+            Pubblicati: <strong>${result.published}</strong><br/>
+            Falliti: <strong>${result.failed}</strong>
+          `);
+        }
         catch (e) { showErr("runOut", e); }
       }
       async function loadDashboard() {
-        try { show("dashOut", await api("/api/v1/dashboard/summary")); }
+        try {
+          const d = await api("/api/v1/dashboard/summary");
+          showHtml("dashOut", `
+            <strong>Bozze totali:</strong> ${d.drafts_total}<br/>
+            <strong>Pubblicazioni totali:</strong> ${d.published_total}<br/>
+            <strong>Pubblicazioni riuscite:</strong> ${d.published_ok}<br/>
+            <strong>Pubblicazioni fallite:</strong> ${d.published_failed}<br/>
+            <small>Dettaglio stato:</small>
+            <pre>${JSON.stringify(d.drafts_by_status, null, 2)}</pre>
+          `);
+        }
         catch (e) { showErr("dashOut", e); }
       }
 
@@ -375,6 +432,7 @@
         $("apiBase").value = window.location.protocol.startsWith("http")
           ? window.location.origin
           : "http://127.0.0.1:8000";
+        loadAIStatus();
       })();
     </script>
   </body>
