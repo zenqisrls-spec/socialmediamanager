@@ -1,0 +1,74 @@
+from __future__ import annotations
+
+import json
+import importlib.util
+import os
+from typing import Any
+
+from dotenv import load_dotenv
+
+from app.services.app_config_service import AppConfigService
+
+load_dotenv()
+
+
+class AIService:
+    """Wrapper minimale per usare OpenAI con fallback locale deterministico."""
+
+    def __init__(self) -> None:
+        self.config_service = AppConfigService()
+
+    def _resolve_runtime_config(self) -> tuple[str, str]:
+        config = self.config_service.load()
+        model = os.getenv("MODEL_NAME") or config.get("model_name", "gpt-4.1-mini")
+        api_key = os.getenv("OPENAI_API_KEY") or config.get("openai_api_key", "")
+        return model, api_key
+
+    @staticmethod
+    def _normalize_json_content(content: str) -> str:
+        raw = content.strip()
+        if raw.startswith("```"):
+            lines = raw.splitlines()
+            if lines and lines[0].startswith("```"):
+                lines = lines[1:]
+            if lines and lines[-1].strip() == "```":
+                lines = lines[:-1]
+            raw = "\n".join(lines).strip()
+        return raw
+
+    @staticmethod
+    def _create_client(api_key: str) -> Any:
+        from openai import OpenAI
+
+        return OpenAI(api_key=api_key)
+
+    def generate_json(self, system_prompt: str, user_prompt: str, fallback: dict[str, Any]) -> dict[str, Any]:
+        model, api_key = self._resolve_runtime_config()
+        if not api_key:
+            return fallback
+
+        try:
+            client = self._create_client(api_key=api_key)
+            completion = client.chat.completions.create(
+                model=model,
+                response_format={"type": "json_object"},
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt},
+                ],
+                temperature=0.7,
+            )
+            content = completion.choices[0].message.content
+            if not content:
+                return fallback
+            normalized = self._normalize_json_content(content)
+            return json.loads(normalized)
+        except Exception:
+            return fallback
+
+    def status(self) -> dict[str, bool]:
+        _, api_key = self._resolve_runtime_config()
+        return {
+            "api_key_configured": bool(api_key),
+            "openai_package_available": importlib.util.find_spec("openai") is not None,
+        }
