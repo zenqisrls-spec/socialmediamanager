@@ -1,0 +1,618 @@
+<!doctype html>
+<html lang="it">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Social Media Manager Pro</title>
+    <style>
+      :root {
+        --bg: #f5f7fb;
+        --card: #ffffff;
+        --text: #1f2937;
+        --muted: #6b7280;
+        --primary: #2563eb;
+        --ok: #059669;
+        --err: #dc2626;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0; padding: 24px;
+        font-family: "Segoe UI", Arial, sans-serif;
+        background: var(--bg); color: var(--text);
+      }
+      .wrap { max-width: 1200px; margin: 0 auto; }
+      .hero {
+        background: linear-gradient(135deg, #1d4ed8, #2563eb);
+        color: white; border-radius: 16px; padding: 18px 20px; margin-bottom: 18px;
+      }
+      .hero h1 { margin: 0 0 6px; font-size: 1.5rem; }
+      .hero p { margin: 0; opacity: .95; }
+      .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; }
+      .card {
+        background: var(--card); border-radius: 14px; padding: 14px;
+        box-shadow: 0 4px 14px rgba(31,41,55,.08);
+      }
+      .card h3 { margin: 0 0 10px; font-size: 1.05rem; }
+      label { font-size: .9rem; color: var(--muted); display: block; margin-top: 8px; }
+      input, select, textarea {
+        width: 100%; border: 1px solid #d1d5db; border-radius: 10px; padding: 8px;
+        margin-top: 4px; font-size: .95rem; background: #fff;
+      }
+      textarea { min-height: 90px; resize: vertical; }
+      .row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+      .actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+      button {
+        border: none; border-radius: 10px; padding: 9px 12px;
+        background: var(--primary); color: #fff; cursor: pointer; font-weight: 600;
+      }
+      button.secondary { background: #4b5563; }
+      button.ghost { background: #e5e7eb; color: #111827; }
+      .status { font-size: .88rem; margin-top: 8px; }
+      .ok { color: var(--ok); }
+      .err { color: var(--err); }
+      pre {
+        background: #0f172a; color: #e2e8f0;
+        border-radius: 10px; padding: 10px; overflow: auto; max-height: 260px;
+      }
+      .hint { color: var(--muted); font-size: .9rem; margin: 6px 0 0; }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div class="hero">
+        <h1>Social Media Manager Pro</h1>
+        <p>Gestione multi-cliente: strategie, contenuti, campagne e automazioni in un unico flusso operativo.</p>
+      </div>
+
+      <div class="card" style="margin-bottom: 16px;">
+        <h3>1) Connessione e login</h3>
+        <label>URL applicazione</label>
+        <input id="apiBase" />
+        <div class="row" style="grid-template-columns: 1fr 1fr auto; margin-top:8px;">
+          <div><label>Utente</label><input id="loginUser" placeholder="admin / approver / editor" /></div>
+          <div><label>Password</label><input id="loginPass" type="password" placeholder="admin123 / approver123 / editor123" /></div>
+          <div style="display:flex; align-items:end;"><button onclick="login()">Accedi</button></div>
+        </div>
+        <div id="loginStatus" class="status"></div>
+        <div id="aiStatus" class="status"></div>
+      </div>
+
+      <div class="grid">
+        <section class="card">
+          <h3>Profilo Cliente (multi-account)</h3>
+          <label>Cliente selezionato</label>
+          <select id="clientSelect"></select>
+          <div class="actions">
+            <button class="secondary" onclick="loadClients()">Aggiorna clienti</button>
+            <button class="ghost" onclick="newClientForm()">Nuovo cliente</button>
+            <button onclick="saveClient()">Salva cliente</button>
+          </div>
+          <div id="clientOut" class="hint"></div>
+          <label>Nome centro</label>
+          <input id="ctxBrand" value="Brand Cliente" />
+          <label>Sito web</label>
+          <input id="ctxWebsite" value="https://example.com" />
+          <label>Settore</label>
+          <input id="ctxIndustry" value="Servizi" />
+          <label>Città / zona</label>
+          <input id="ctxCity" value="Italia" />
+          <label>Valore distintivo</label>
+          <textarea id="ctxValue">Proposta di valore unica del cliente</textarea>
+          <label>Note operative cliente</label>
+          <textarea id="ctxNotes"></textarea>
+          <p class="hint">Questi dati verranno usati per personalizzare strategie, post e campagne.</p>
+        </section>
+
+        <section class="card">
+          <h3>2) Configurazione generale</h3>
+          <label>OpenAI API Key (facoltativa)</label>
+          <input id="cfgApiKey" type="password" />
+          <label>Modello AI</label>
+          <input id="cfgModel" value="gpt-4.1-mini" />
+          <label><input id="cfgApproval" type="checkbox" checked /> Richiedi approvazione umana</label>
+          <label><input id="cfgAutopublish" type="checkbox" /> Abilita autopubblicazione</label>
+          <label><input id="cfgWhatsapp" type="checkbox" /> Abilita WhatsApp</label>
+          <p class="hint">Per pubblicazione reale compila anche i campi integrazioni.</p>
+          <div class="actions">
+            <button class="secondary" onclick="loadConfig()">Carica configurazione</button>
+            <button onclick="saveConfig()">Salva configurazione</button>
+          </div>
+          <div id="cfgOut" class="hint"></div>
+        </section>
+
+        <section class="card">
+          <h3>3) Integrazioni piattaforme</h3>
+          <label>Meta Access Token</label>
+          <input id="cfgMetaToken" type="password" />
+          <label>Meta Page ID</label>
+          <input id="cfgMetaPageId" />
+          <label>WhatsApp Token</label>
+          <input id="cfgWaToken" type="password" />
+          <label>WhatsApp Phone Number ID</label>
+          <input id="cfgWaPhoneId" />
+          <label>Numero destinatario WhatsApp</label>
+          <input id="cfgWaTo" placeholder="es: 393331234567" />
+          <p class="hint">Questi dati vengono salvati quando premi “Salva configurazione”.</p>
+        </section>
+
+        <section class="card">
+          <h3>4) Genera strategia marketing</h3>
+          <label>Obiettivo principale</label>
+          <select id="strGoal">
+            <option value="awareness">Awareness (visibilità)</option>
+            <option value="lead_generation">Lead generation (contatti)</option>
+            <option value="retention">Retention (fidelizzazione)</option>
+          </select>
+          <label>Budget mensile (€)</label>
+          <input id="strBudget" type="number" value="1200" />
+          <label>Prompt extra strategia (obbligatorio)</label>
+          <textarea id="strPrompt" placeholder="Es: focalizzati su lead B2B premium, evita tono promozionale aggressivo"></textarea>
+          <div class="actions"><button onclick="generateStrategy()">Genera strategia</button></div>
+          <div id="strOut" class="hint"></div>
+        </section>
+
+        <section class="card">
+          <h3>5) Genera contenuti social</h3>
+          <label>Canali (separati da virgola)</label>
+          <input id="cntChannels" value="instagram,facebook" />
+          <label>Obiettivi (separati da virgola)</label>
+          <input id="cntGoals" value="awareness,lead_generation" />
+          <label>Post a settimana</label>
+          <input id="cntPosts" type="number" value="4" />
+          <label>Argomenti dei post (separati da virgola)</label>
+          <input id="cntTopics" placeholder="es: meditazione, sonno, respirazione" />
+          <label>Prompt extra contenuti (obbligatorio)</label>
+          <textarea id="cntPrompt" placeholder="Es: crea 4 post educativi con CTA soft e inserisci idea immagine per ogni post"></textarea>
+          <label><input id="cntAutoDrafts" type="checkbox" /> Crea automaticamente bozze dopo la generazione</label>
+          <div class="actions"><button onclick="generateContent()">Genera post</button></div>
+          <div id="cntOut" class="hint"></div>
+        </section>
+
+        <section class="card">
+          <h3>6) Genera campagne ADS</h3>
+          <label>Obiettivi (separati da virgola)</label>
+          <input id="adsGoals" value="lead_generation" />
+          <label>Budget mensile (€)</label>
+          <input id="adsBudget" type="number" value="1500" />
+          <label>Argomenti campagne (separati da virgola)</label>
+          <input id="adsTopics" placeholder="es: gestione stress, percorsi detox" />
+          <label>Prompt extra ADS (obbligatorio)</label>
+          <textarea id="adsPrompt" placeholder="Es: crea varianti per prospecting e retargeting con taglio professionale"></textarea>
+          <label>Nome batch campagne</label>
+          <input id="adsBatchName" value="Batch campagne del giorno" />
+          <label>Note batch (opzionale)</label>
+          <input id="adsBatchNotes" />
+          <div class="actions">
+            <button onclick="generateAds()">Genera campagne</button>
+            <button class="secondary" onclick="saveGeneratedAdsBatch()">Salva batch</button>
+            <button class="ghost" onclick="loadCampaigns()">Storico campagne</button>
+          </div>
+          <div id="adsOut" class="hint"></div>
+        </section>
+
+        <section class="card">
+          <h3>7) Calendario schedulazione</h3>
+          <label>Data inizio</label>
+          <input id="schStartDate" type="date" />
+          <label>Settimane</label>
+          <input id="schWeeks" type="number" value="4" />
+          <label>Canali (separati da virgola)</label>
+          <input id="schChannels" value="instagram,facebook" />
+          <label>Post a settimana</label>
+          <input id="schPostsPerWeek" type="number" value="4" />
+          <div class="actions"><button onclick="buildSchedule()">Genera calendario</button></div>
+          <div id="schOut" class="hint"></div>
+        </section>
+
+        <section class="card">
+          <h3>8) Crea bozza automazione</h3>
+          <label>Canale</label>
+          <select id="autoChannel">
+            <option>instagram</option><option>facebook</option><option>whatsapp</option><option>tiktok</option>
+          </select>
+          <label>Contenuto</label>
+          <textarea id="autoContent">Post automatico del cliente del giorno.</textarea>
+          <label>Data/Ora pubblicazione (ISO UTC, opzionale)</label>
+          <input id="autoWhen" placeholder="2026-03-25T10:00:00+00:00" />
+          <div class="actions">
+            <button onclick="createDraft()">Crea bozza</button>
+            <button class="secondary" onclick="loadDrafts()">Aggiorna bozze</button>
+          </div>
+          <div id="autoOut" class="hint"></div>
+        </section>
+
+        <section class="card">
+          <h3>9) Approvazione e run</h3>
+          <label>ID bozza</label>
+          <input id="draftIdAction" placeholder="Incolla ID bozza da approvare/rifiutare" />
+          <div class="actions">
+            <button onclick="approveDraft()">Approva</button>
+            <button class="secondary" onclick="rejectDraft()">Rifiuta</button>
+            <button class="ghost" onclick="runAutomation()">Esegui automazione ora</button>
+          </div>
+          <div id="runOut" class="hint"></div>
+        </section>
+
+        <section class="card">
+          <h3>10) Dashboard KPI</h3>
+          <div class="actions"><button class="secondary" onclick="loadDashboard()">Aggiorna KPI</button></div>
+          <div id="dashOut" class="hint"></div>
+        </section>
+      </div>
+    </div>
+
+    <script>
+      let authToken = "";
+      let lastGeneratedCampaigns = [];
+      let selectedClientId = "";
+      const $ = (id) => document.getElementById(id);
+      const splitCsv = (v) => v.split(",").map(x => x.trim()).filter(Boolean);
+      const baseUrl = () => $("apiBase").value.replace(/\/$/, "");
+      const authHeaders = () => authToken ? { "Authorization": `Bearer ${authToken}` } : {};
+      const getContext = () => ({
+        brand_name: $("ctxBrand").value,
+        website: $("ctxWebsite").value,
+        industry: $("ctxIndustry").value,
+        city: $("ctxCity").value,
+        unique_value: $("ctxValue").value
+      });
+      const clientPayload = () => ({
+        name: $("ctxBrand").value,
+        website: $("ctxWebsite").value,
+        industry: $("ctxIndustry").value,
+        city: $("ctxCity").value,
+        unique_value: $("ctxValue").value,
+        notes: $("ctxNotes").value,
+        openai_api_key: $("cfgApiKey").value,
+        model_name: $("cfgModel").value,
+        require_human_approval: $("cfgApproval").checked,
+        autopublish_enabled: $("cfgAutopublish").checked,
+        whatsapp_enabled: $("cfgWhatsapp").checked,
+        meta_access_token: $("cfgMetaToken").value,
+        meta_page_id: $("cfgMetaPageId").value,
+        whatsapp_token: $("cfgWaToken").value,
+        whatsapp_phone_number_id: $("cfgWaPhoneId").value,
+        whatsapp_to: $("cfgWaTo").value
+      });
+
+      async function api(path, method = "GET", body = null) {
+        const headers = { ...authHeaders() };
+        if (body !== null) headers["Content-Type"] = "application/json";
+        const res = await fetch(`${baseUrl()}${path}`, {
+          method, headers, body: body !== null ? JSON.stringify(body) : undefined
+        });
+        const txt = await res.text();
+        let data;
+        try { data = txt ? JSON.parse(txt) : {}; } catch { data = { raw: txt }; }
+        if (!res.ok) throw new Error(`${res.status} - ${JSON.stringify(data)}`);
+        return data;
+      }
+
+      function show(outId, data) { $(outId).textContent = JSON.stringify(data, null, 2); }
+      function showErr(outId, e) { $(outId).textContent = `Errore: ${e}`; }
+      function showHtml(outId, html) { $(outId).innerHTML = html; }
+
+      async function login() {
+        $("loginStatus").textContent = "Accesso in corso...";
+        try {
+          const data = await api("/api/v1/auth/login", "POST", {
+            username: $("loginUser").value, password: $("loginPass").value
+          });
+          authToken = data.access_token;
+          $("loginStatus").innerHTML = `<span class="ok">Accesso riuscito</span> (ruolo: ${data.role})`;
+          await loadConfig();
+          await loadAIStatus();
+          await loadClients();
+          await loadDashboard();
+        } catch (e) {
+          $("loginStatus").innerHTML = `<span class="err">Accesso fallito:</span> ${e}`;
+        }
+      }
+
+      function fillClientForm(c) {
+        $("ctxBrand").value = c.name || "";
+        $("ctxWebsite").value = c.website || "";
+        $("ctxIndustry").value = c.industry || "";
+        $("ctxCity").value = c.city || "";
+        $("ctxValue").value = c.unique_value || "";
+        $("ctxNotes").value = c.notes || "";
+        $("cfgApiKey").value = c.openai_api_key || "";
+        $("cfgModel").value = c.model_name || "gpt-4.1-mini";
+        $("cfgApproval").checked = !!c.require_human_approval;
+        $("cfgAutopublish").checked = !!c.autopublish_enabled;
+        $("cfgWhatsapp").checked = !!c.whatsapp_enabled;
+        $("cfgMetaToken").value = c.meta_access_token || "";
+        $("cfgMetaPageId").value = c.meta_page_id || "";
+        $("cfgWaToken").value = c.whatsapp_token || "";
+        $("cfgWaPhoneId").value = c.whatsapp_phone_number_id || "";
+        $("cfgWaTo").value = c.whatsapp_to || "";
+      }
+
+      function newClientForm() {
+        selectedClientId = "";
+        fillClientForm({ name: "", website: "", industry: "", city: "", unique_value: "", notes: "" });
+        $("clientOut").textContent = "Nuovo cliente: compila i campi e premi Salva cliente.";
+      }
+
+      async function loadClients() {
+        try {
+          const clients = await api("/api/v1/clients");
+          const sel = $("clientSelect");
+          sel.innerHTML = clients.length
+            ? clients.map(c => `<option value="${c.id}">${c.name} — ${c.city}</option>`).join("")
+            : `<option value="">Nessun cliente</option>`;
+          if (clients.length) {
+            selectedClientId = clients[0].id;
+            fillClientForm(clients[0]);
+          }
+          sel.onchange = async () => {
+            selectedClientId = sel.value;
+            if (!selectedClientId) return;
+            const c = await api(`/api/v1/clients/${selectedClientId}`);
+            fillClientForm(c);
+          };
+          $("clientOut").textContent = `Clienti caricati: ${clients.length}`;
+        } catch (e) { showErr("clientOut", e); }
+      }
+
+      async function saveClient() {
+        try {
+          const payload = clientPayload();
+          if (!payload.name.trim()) throw new Error("Nome cliente obbligatorio");
+          const path = selectedClientId ? `/api/v1/clients/${selectedClientId}` : "/api/v1/clients";
+          const method = selectedClientId ? "PUT" : "POST";
+          const data = await api(path, method, payload);
+          selectedClientId = data.id;
+          await loadClients();
+          $("clientOut").innerHTML = `<span class="ok">Cliente salvato</span>: ${data.name}`;
+        } catch (e) { showErr("clientOut", e); }
+      }
+
+      async function loadConfig() {
+        try {
+          if (!selectedClientId) throw new Error("Seleziona prima un cliente");
+          const cfg = await api(`/api/v1/clients/${selectedClientId}`);
+          $("cfgApiKey").value = cfg.openai_api_key || "";
+          $("cfgModel").value = cfg.model_name || "gpt-4.1-mini";
+          $("cfgApproval").checked = !!cfg.require_human_approval;
+          $("cfgAutopublish").checked = !!cfg.autopublish_enabled;
+          $("cfgWhatsapp").checked = !!cfg.whatsapp_enabled;
+          $("cfgMetaToken").value = cfg.meta_access_token || "";
+          $("cfgMetaPageId").value = cfg.meta_page_id || "";
+          $("cfgWaToken").value = cfg.whatsapp_token || "";
+          $("cfgWaPhoneId").value = cfg.whatsapp_phone_number_id || "";
+          $("cfgWaTo").value = cfg.whatsapp_to || "";
+          showHtml("cfgOut", `
+            <strong>Configurazione caricata.</strong><br/>
+            Modello AI: <strong>${cfg.model_name}</strong><br/>
+            Approvazione umana: <strong>${cfg.require_human_approval ? "Attiva" : "Disattiva"}</strong><br/>
+            Autopubblicazione: <strong>${cfg.autopublish_enabled ? "Attiva" : "Disattiva"}</strong>
+          `);
+        } catch (e) { showErr("cfgOut", e); }
+      }
+
+      async function saveConfig() {
+        await saveClient();
+        showHtml("cfgOut", `<span class="ok">Configurazione cliente salvata con successo.</span>`);
+        await loadAIStatus();
+      }
+
+      async function loadAIStatus() {
+        try {
+          const s = await api("/api/v1/ai/status");
+          const statusText = s.api_key_configured && s.openai_package_available
+            ? `<span class="ok">AI attiva</span>: i contenuti possono essere generati da OpenAI.`
+            : `<span class="err">AI fallback</span>: mancano API key o pacchetto openai.`;
+          $("aiStatus").innerHTML = statusText;
+        } catch (e) {
+          $("aiStatus").textContent = `Errore stato AI: ${e}`;
+        }
+      }
+
+      async function generateStrategy() {
+        try {
+          const payload = {
+            goals: [$("strGoal").value],
+            client_id: selectedClientId,
+            monthly_budget_eur: Number($("strBudget").value || 0),
+            prompt_instructions: $("strPrompt").value,
+            context: getContext()
+          };
+          if (!payload.prompt_instructions.trim()) throw new Error("Prompt strategia obbligatorio");
+          const data = await api("/api/v1/strategy/generate", "POST", payload);
+          showHtml("strOut", `
+            <strong>Posizionamento:</strong> ${data.strategic_positioning}<br/><br/>
+            <strong>Pilastri mensili:</strong><ul>${data.monthly_pillars.map(p => `<li>${p}</li>`).join("")}</ul>
+            <strong>KPI consigliati:</strong><ul>${data.kpis.map(k => `<li>${k}</li>`).join("")}</ul>
+            <strong>Funnel offerta:</strong><ul>${data.offer_funnel.map(f => `<li>${f}</li>`).join("")}</ul>
+          `);
+        } catch (e) { showErr("strOut", e); }
+      }
+
+      async function generateContent() {
+        try {
+          const payload = {
+            goals: splitCsv($("cntGoals").value),
+            client_id: selectedClientId,
+            channels: splitCsv($("cntChannels").value),
+            posts_per_week: Number($("cntPosts").value || 4),
+            topics: splitCsv($("cntTopics").value),
+            prompt_instructions: $("cntPrompt").value,
+            context: getContext()
+          };
+          if (!payload.prompt_instructions.trim()) throw new Error("Prompt contenuti obbligatorio");
+          const path = $("cntAutoDrafts").checked
+            ? "/api/v1/content/generate-posts-and-drafts"
+            : "/api/v1/content/generate-posts";
+          const data = await api(path, "POST", payload);
+          showHtml("cntOut",
+            `
+            ${$("cntAutoDrafts").checked ? `<div><strong>Bozze create automaticamente:</strong> ${(data.created_drafts || []).length}</div><br/>` : ""}
+            ${(data.post_ideas || []).map((p, i) => `
+              <div style="background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:8px;margin-bottom:8px;">
+                <strong>Post ${i + 1} — ${p.channel.toUpperCase()} (${p.content_type})</strong><br/>
+                <em>Obiettivo:</em> ${p.objective}<br/>
+                <em>Hook:</em> ${p.hook}<br/>
+                <em>Testo:</em> ${p.caption}<br/>
+                <em>CTA:</em> ${p.call_to_action}
+                <br/><em>Prompt immagine:</em> ${p.image_prompt || "-"}
+                <br/><em>URL immagine:</em> ${p.image_url || "-"}
+              </div>
+            `).join("")}
+            `
+          );
+        } catch (e) { showErr("cntOut", e); }
+      }
+
+      async function generateAds() {
+        try {
+          const payload = {
+            goals: splitCsv($("adsGoals").value),
+            client_id: selectedClientId,
+            monthly_budget_eur: Number($("adsBudget").value || 0),
+            topics: splitCsv($("adsTopics").value),
+            prompt_instructions: $("adsPrompt").value,
+            context: getContext()
+          };
+          if (!payload.prompt_instructions.trim()) throw new Error("Prompt ADS obbligatorio");
+          const data = await api("/api/v1/ads/generate-campaigns", "POST", payload);
+          lastGeneratedCampaigns = data.campaigns || [];
+          showHtml("adsOut",
+            data.campaigns.map((c, i) => `
+              <div style="background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:8px;margin-bottom:8px;">
+                <strong>Campagna ${i + 1} — ${c.platform}</strong><br/>
+                <em>Nome:</em> ${c.campaign_name}<br/>
+                <em>Obiettivo:</em> ${c.objective}<br/>
+                <em>Target:</em> ${c.target_audience}<br/>
+                <em>Budget giornaliero:</em> € ${c.daily_budget_eur}<br/>
+                <em>Messaggio:</em> ${c.ad_copy}<br/>
+                <em>KPI:</em> ${c.kpi_target}<br/>
+                <em>Brief immagine:</em> ${c.creative_brief_image || "-"}
+              </div>
+            `).join("")
+          );
+        } catch (e) { showErr("adsOut", e); }
+      }
+
+      async function saveGeneratedAdsBatch() {
+        try {
+          if (!lastGeneratedCampaigns.length) throw new Error("Prima genera almeno una campagna.");
+          const payload = {
+            name: $("adsBatchName").value || "Batch campagne",
+            client_id: selectedClientId,
+            notes: $("adsBatchNotes").value || "",
+            campaigns: lastGeneratedCampaigns
+          };
+          const data = await api("/api/v1/campaigns/batches", "POST", payload);
+          showHtml("adsOut", `<span class="ok">Batch salvato.</span><br/>ID batch: <strong>${data.batch_id}</strong><br/>Campagne: ${data.campaigns.length}`);
+        } catch (e) { showErr("adsOut", e); }
+      }
+
+      async function loadCampaigns() {
+        try {
+          const batches = await api(`/api/v1/campaigns/batches?client_id=${encodeURIComponent(selectedClientId)}`);
+          const campaigns = await api(`/api/v1/campaigns?client_id=${encodeURIComponent(selectedClientId)}`);
+          const rows = campaigns.slice(0, 20).map(c => `
+            <tr>
+              <td>${c.campaign_name}</td>
+              <td>${c.platform}</td>
+              <td>${c.status}</td>
+              <td>${c.objective}</td>
+              <td>€ ${c.daily_budget_eur}</td>
+            </tr>
+          `).join("");
+          showHtml("adsOut", `
+            <strong>Batch salvati:</strong> ${batches.length}<br/>
+            <strong>Campagne storicizzate:</strong> ${campaigns.length}<br/>
+            <table style="width:100%;border-collapse:collapse;margin-top:8px;">
+              <thead><tr><th style="text-align:left;">Nome</th><th style="text-align:left;">Piattaforma</th><th style="text-align:left;">Stato</th><th style="text-align:left;">Obiettivo</th><th style="text-align:left;">Budget</th></tr></thead>
+              <tbody>${rows}</tbody>
+            </table>
+          `);
+        } catch (e) { showErr("adsOut", e); }
+      }
+
+      async function createDraft() {
+        try {
+          const payload = {
+            client_id: selectedClientId,
+            channel: $("autoChannel").value,
+            content: $("autoContent").value,
+            scheduled_for: $("autoWhen").value || null
+          };
+          show("autoOut", await api("/api/v1/automation/drafts", "POST", payload));
+        } catch (e) { showErr("autoOut", e); }
+      }
+
+      async function loadDrafts() {
+        try {
+          const drafts = await api("/api/v1/automation/drafts");
+          const published = await api("/api/v1/automation/published");
+          showHtml("autoOut", `
+            <strong>Bozze attive:</strong> ${drafts.length}<br/>
+            <strong>Pubblicazioni storiche:</strong> ${published.length}<br/>
+            <small>Seleziona una bozza per approvare/rifiutare:</small>
+            <ul>${drafts.slice(0, 10).map(d => `<li><button class="ghost" onclick="document.getElementById('draftIdAction').value='${d.id}'">Usa</button> ${d.channel.toUpperCase()} - ${d.status} - ${d.content.slice(0,80)}...</li>`).join("")}</ul>
+          `);
+        } catch (e) { showErr("autoOut", e); }
+      }
+
+      async function buildSchedule() {
+        try {
+          const payload = {
+            start_date: $("schStartDate").value || new Date().toISOString().slice(0, 10),
+            weeks: Number($("schWeeks").value || 4),
+            channels: splitCsv($("schChannels").value),
+            posts_per_week: Number($("schPostsPerWeek").value || 4)
+          };
+          const data = await api("/api/v1/scheduler/build", "POST", payload);
+          const rows = (data.items || []).slice(0, 40).map(i => `<tr><td>${i.publication_date}</td><td>${i.channel}</td><td>${i.slot}</td><td>${i.content_theme}</td></tr>`).join("");
+          showHtml("schOut", `<table style="width:100%;border-collapse:collapse;"><thead><tr><th>Data</th><th>Canale</th><th>Orario</th><th>Tema</th></tr></thead><tbody>${rows}</tbody></table>`);
+        } catch (e) { showErr("schOut", e); }
+      }
+
+      async function approveDraft() {
+        try { show("runOut", await api(`/api/v1/automation/drafts/${$("draftIdAction").value}/approve`, "POST")); }
+        catch (e) { showErr("runOut", e); }
+      }
+      async function rejectDraft() {
+        try { show("runOut", await api(`/api/v1/automation/drafts/${$("draftIdAction").value}/reject`, "POST")); }
+        catch (e) { showErr("runOut", e); }
+      }
+      async function runAutomation() {
+        try {
+          const result = await api("/api/v1/automation/run", "POST");
+          showHtml("runOut", `
+            <strong>Automazione eseguita.</strong><br/>
+            Processati: <strong>${result.processed}</strong><br/>
+            Pubblicati: <strong>${result.published}</strong><br/>
+            Falliti: <strong>${result.failed}</strong>
+          `);
+        }
+        catch (e) { showErr("runOut", e); }
+      }
+      async function loadDashboard() {
+        try {
+          const d = await api("/api/v1/dashboard/summary");
+          showHtml("dashOut", `
+            <strong>Bozze totali:</strong> ${d.drafts_total}<br/>
+            <strong>Pubblicazioni totali:</strong> ${d.published_total}<br/>
+            <strong>Pubblicazioni riuscite:</strong> ${d.published_ok}<br/>
+            <strong>Pubblicazioni fallite:</strong> ${d.published_failed}<br/>
+            <small>Dettaglio stato:</small>
+            <pre>${JSON.stringify(d.drafts_by_status, null, 2)}</pre>
+          `);
+        }
+        catch (e) { showErr("dashOut", e); }
+      }
+
+      (function init() {
+        $("apiBase").value = window.location.protocol.startsWith("http")
+          ? window.location.origin
+          : "http://127.0.0.1:8000";
+        $("schStartDate").value = new Date().toISOString().slice(0, 10);
+        loadAIStatus();
+      })();
+    </script>
+  </body>
+</html>
