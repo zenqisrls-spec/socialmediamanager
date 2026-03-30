@@ -120,6 +120,7 @@ def test_create_drafts_from_generated_posts():
 def test_campaign_batch_storage_and_status_update():
     service = CampaignService()
     created = service.create_batch(
+        client_id="",
         name="Batch Test",
         notes="note",
         created_by="admin",

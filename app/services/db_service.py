@@ -35,6 +35,7 @@ class DBService:
 
                 CREATE TABLE IF NOT EXISTS drafts (
                     id TEXT PRIMARY KEY,
+                    client_id TEXT NOT NULL DEFAULT '',
                     channel TEXT NOT NULL,
                     content TEXT NOT NULL,
                     status TEXT NOT NULL,
@@ -54,6 +55,7 @@ class DBService:
 
                 CREATE TABLE IF NOT EXISTS campaign_batches (
                     id TEXT PRIMARY KEY,
+                    client_id TEXT NOT NULL DEFAULT '',
                     name TEXT NOT NULL,
                     created_by TEXT NOT NULL,
                     notes TEXT NOT NULL,
@@ -62,6 +64,7 @@ class DBService:
 
                 CREATE TABLE IF NOT EXISTS campaigns (
                     id TEXT PRIMARY KEY,
+                    client_id TEXT NOT NULL DEFAULT '',
                     batch_id TEXT NOT NULL,
                     platform TEXT NOT NULL,
                     campaign_name TEXT NOT NULL,
@@ -86,6 +89,16 @@ class DBService:
                     city TEXT NOT NULL,
                     unique_value TEXT NOT NULL,
                     notes TEXT NOT NULL,
+                    openai_api_key TEXT NOT NULL DEFAULT '',
+                    model_name TEXT NOT NULL DEFAULT 'gpt-4.1-mini',
+                    require_human_approval INTEGER NOT NULL DEFAULT 1,
+                    autopublish_enabled INTEGER NOT NULL DEFAULT 0,
+                    whatsapp_enabled INTEGER NOT NULL DEFAULT 0,
+                    meta_access_token TEXT NOT NULL DEFAULT '',
+                    meta_page_id TEXT NOT NULL DEFAULT '',
+                    whatsapp_token TEXT NOT NULL DEFAULT '',
+                    whatsapp_phone_number_id TEXT NOT NULL DEFAULT '',
+                    whatsapp_to TEXT NOT NULL DEFAULT '',
                     created_at TEXT NOT NULL,
                     updated_at TEXT NOT NULL
                 );
@@ -108,6 +121,31 @@ class DBService:
             columns = [r[1] for r in conn.execute("PRAGMA table_info(campaigns)").fetchall()]
             if "creative_brief_image" not in columns:
                 conn.execute("ALTER TABLE campaigns ADD COLUMN creative_brief_image TEXT NOT NULL DEFAULT ''")
+            client_columns = [r[1] for r in conn.execute("PRAGMA table_info(clients)").fetchall()]
+            needed_client_columns = {
+                "openai_api_key": "ALTER TABLE clients ADD COLUMN openai_api_key TEXT NOT NULL DEFAULT ''",
+                "model_name": "ALTER TABLE clients ADD COLUMN model_name TEXT NOT NULL DEFAULT 'gpt-4.1-mini'",
+                "require_human_approval": "ALTER TABLE clients ADD COLUMN require_human_approval INTEGER NOT NULL DEFAULT 1",
+                "autopublish_enabled": "ALTER TABLE clients ADD COLUMN autopublish_enabled INTEGER NOT NULL DEFAULT 0",
+                "whatsapp_enabled": "ALTER TABLE clients ADD COLUMN whatsapp_enabled INTEGER NOT NULL DEFAULT 0",
+                "meta_access_token": "ALTER TABLE clients ADD COLUMN meta_access_token TEXT NOT NULL DEFAULT ''",
+                "meta_page_id": "ALTER TABLE clients ADD COLUMN meta_page_id TEXT NOT NULL DEFAULT ''",
+                "whatsapp_token": "ALTER TABLE clients ADD COLUMN whatsapp_token TEXT NOT NULL DEFAULT ''",
+                "whatsapp_phone_number_id": "ALTER TABLE clients ADD COLUMN whatsapp_phone_number_id TEXT NOT NULL DEFAULT ''",
+                "whatsapp_to": "ALTER TABLE clients ADD COLUMN whatsapp_to TEXT NOT NULL DEFAULT ''",
+            }
+            for col, ddl in needed_client_columns.items():
+                if col not in client_columns:
+                    conn.execute(ddl)
+            draft_columns = [r[1] for r in conn.execute("PRAGMA table_info(drafts)").fetchall()]
+            if "client_id" not in draft_columns:
+                conn.execute("ALTER TABLE drafts ADD COLUMN client_id TEXT NOT NULL DEFAULT ''")
+            campaign_batch_columns = [r[1] for r in conn.execute("PRAGMA table_info(campaign_batches)").fetchall()]
+            if "client_id" not in campaign_batch_columns:
+                conn.execute("ALTER TABLE campaign_batches ADD COLUMN client_id TEXT NOT NULL DEFAULT ''")
+            campaign_columns = [r[1] for r in conn.execute("PRAGMA table_info(campaigns)").fetchall()]
+            if "client_id" not in campaign_columns:
+                conn.execute("ALTER TABLE campaigns ADD COLUMN client_id TEXT NOT NULL DEFAULT ''")
             conn.execute(
                 """
                 INSERT OR IGNORE INTO app_config(id) VALUES (1)

@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from app.services.db_service import DBService
+from app.services.client_service import ClientService
 from app.services.publisher_service import PublisherService
 
 
@@ -24,10 +25,12 @@ class AutomationService:
     def __init__(self) -> None:
         self.db = DBService()
         self.publisher = PublisherService()
+        self.client_service = ClientService()
 
-    def create_draft(self, channel: str, content: str, scheduled_for: str | None) -> dict[str, Any]:
+    def create_draft(self, channel: str, content: str, scheduled_for: str | None, client_id: str = "") -> dict[str, Any]:
         item = {
             "id": str(uuid.uuid4()),
+            "client_id": client_id,
             "channel": channel,
             "content": content,
             "status": "pending_approval",
@@ -38,11 +41,12 @@ class AutomationService:
         with self.db.connect() as conn:
             conn.execute(
                 """
-                INSERT INTO drafts(id, channel, content, status, scheduled_for, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO drafts(id, client_id, channel, content, status, scheduled_for, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     item["id"],
+                    item["client_id"],
                     item["channel"],
                     item["content"],
                     item["status"],
@@ -54,7 +58,9 @@ class AutomationService:
             conn.commit()
         return item
 
-    def create_drafts_from_posts(self, posts: list[dict[str, Any]], scheduled_for: str | None = None) -> list[dict[str, Any]]:
+    def create_drafts_from_posts(
+        self, posts: list[dict[str, Any]], scheduled_for: str | None = None, client_id: str = ""
+    ) -> list[dict[str, Any]]:
         created = []
         for post in posts:
             content = f"{post.get('hook', '')}\n\n{post.get('caption', '')}\n\nCTA: {post.get('call_to_action', '')}".strip()
@@ -63,6 +69,7 @@ class AutomationService:
                     channel=post.get("channel", "instagram"),
                     content=content,
                     scheduled_for=scheduled_for,
+                    client_id=client_id,
                 )
             )
         return created
@@ -116,7 +123,12 @@ class AutomationService:
                 if not _is_due(item.get("scheduled_for", "")):
                     continue
 
-                result = self.publisher.publish(item["channel"], item["content"], cfg)
+                publish_cfg = cfg
+                if item.get("client_id"):
+                    client = self.client_service.get(item["client_id"])
+                    if client:
+                        publish_cfg = {**cfg, **client}
+                result = self.publisher.publish(item["channel"], item["content"], publish_cfg)
                 processed += 1
                 if result["status"] == "published":
                     published += 1

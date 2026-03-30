@@ -30,7 +30,7 @@ class MarketingService:
             return payload.json()  # type: ignore[attr-defined]
         return str(payload)
 
-    def generate_strategy(self, payload: StrategyRequest) -> StrategyResponse:
+    def generate_strategy(self, payload: StrategyRequest, runtime_config: dict | None = None) -> StrategyResponse:
         brand = payload.context.brand_name
         city = payload.context.city
         fallback = {
@@ -65,10 +65,11 @@ class MarketingService:
             "Sei un marketing strategist senior per centri olistici. Rispondi in JSON valido.",
             f"Genera una strategia per: {self._payload_json(payload)}. Indicazioni extra: {payload.prompt_instructions}",
             fallback,
+            runtime_config=runtime_config,
         )
         return StrategyResponse(**result)
 
-    def generate_posts(self, payload: ContentRequest) -> ContentResponse:
+    def generate_posts(self, payload: ContentRequest, runtime_config: dict | None = None) -> ContentResponse:
         fallback_posts = []
         content_types = ["reel", "carousel", "stories", "post statico", "live teaser"]
         topics = payload.topics or ["benessere olistico", "gestione dello stress", "energia quotidiana"]
@@ -80,12 +81,15 @@ class MarketingService:
                 {
                     "channel": channel,
                     "content_type": content_types[idx % len(content_types)],
-                    "hook": f"{topic.title()}: 3 segnali da non ignorare ({idx + 1})",
-                    "caption": f"Scopri una pratica semplice su '{topic}' da inserire oggi per ridurre stress e ritrovare energia.",
+                    "hook": f"{topic.title()}: approccio pratico #{idx + 1}",
+                    "caption": f"Per {payload.context.brand_name}, focus su '{topic}' con consiglio concreto e contestualizzato per {payload.context.city}.",
                     "call_to_action": f"Prenota ora da {payload.context.brand_name} - {payload.context.website}",
                     "objective": goal,
                     "image_prompt": f"Foto professionale lifestyle su tema {topic}, brand {payload.context.brand_name}, città {payload.context.city}, stile naturale.",
-                    "image_url": "",
+                    "image_url": self.ai.generate_image_url(
+                        f"Immagine social per {payload.context.brand_name} su {topic} in {payload.context.city}",
+                        runtime_config=runtime_config,
+                    ),
                 }
             )
 
@@ -94,11 +98,15 @@ class MarketingService:
             "Sei un social media manager per un centro olistico. Rispondi in JSON valido.",
             f"Crea idee post social per: {self._payload_json(payload)}. Indicazioni extra: {payload.prompt_instructions}. Includi anche image_prompt e image_url (se disponibile).",
             fallback,
+            runtime_config=runtime_config,
         )
+        for item in result.get("post_ideas", []):
+            if not item.get("image_url"):
+                item["image_url"] = self.ai.generate_image_url(item.get("image_prompt", "social media image"), runtime_config=runtime_config)
         parsed = [PostIdea(**item) for item in result["post_ideas"]]
         return ContentResponse(post_ideas=parsed)
 
-    def generate_campaigns(self, payload: AdsRequest) -> AdsResponse:
+    def generate_campaigns(self, payload: AdsRequest, runtime_config: dict | None = None) -> AdsResponse:
         daily_budget = round(payload.monthly_budget_eur / 30, 2)
         topics = payload.topics or ["benessere olistico personalizzato"]
         brand = payload.context.brand_name
@@ -138,6 +146,7 @@ class MarketingService:
             "Sei un media buyer senior. Rispondi in JSON valido.",
             f"Genera campagne per: {self._payload_json(payload)}. Indicazioni extra: {payload.prompt_instructions}. Includi creative_brief_image.",
             fallback,
+            runtime_config=runtime_config,
         )
         return AdsResponse(campaigns=[CampaignIdea(**item) for item in result["campaigns"]])
 

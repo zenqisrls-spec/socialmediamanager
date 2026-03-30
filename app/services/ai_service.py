@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import importlib.util
 import os
+from urllib.parse import quote_plus
 from typing import Any
 
 from app.services.app_config_service import AppConfigService
@@ -38,8 +39,17 @@ class AIService:
 
         return OpenAI(api_key=api_key)
 
-    def generate_json(self, system_prompt: str, user_prompt: str, fallback: dict[str, Any]) -> dict[str, Any]:
+    def generate_json(
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        fallback: dict[str, Any],
+        runtime_config: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         model, api_key = self._resolve_runtime_config()
+        if runtime_config:
+            model = runtime_config.get("model_name", model)
+            api_key = runtime_config.get("openai_api_key", api_key)
         if not api_key:
             return fallback
 
@@ -61,6 +71,22 @@ class AIService:
             return json.loads(normalized)
         except Exception:
             return fallback
+
+    def generate_image_url(self, prompt: str, runtime_config: dict[str, Any] | None = None) -> str:
+        model, api_key = self._resolve_runtime_config()
+        if runtime_config:
+            model = runtime_config.get("model_name", model)
+            api_key = runtime_config.get("openai_api_key", api_key)
+        if api_key:
+            try:
+                client = self._create_client(api_key=api_key)
+                response = client.images.generate(model="gpt-image-1", prompt=prompt, size="1024x1024")
+                data = getattr(response, "data", None) or []
+                if data and getattr(data[0], "url", None):
+                    return str(data[0].url)
+            except Exception:
+                pass
+        return f"https://picsum.photos/seed/{quote_plus(prompt)}/1024/1024"
 
     def status(self) -> dict[str, bool]:
         _, api_key = self._resolve_runtime_config()

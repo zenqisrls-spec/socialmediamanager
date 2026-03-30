@@ -21,6 +21,7 @@ class BusinessContext(BaseModel):
 
 
 class StrategyRequest(BaseModel):
+    client_id: str = Field(default="")
     goals: list[GoalType] = Field(default_factory=lambda: ["awareness", "retention"])
     monthly_budget_eur: float = Field(default=1200, ge=0)
     prompt_instructions: str = Field(default="")
@@ -36,6 +37,7 @@ class StrategyResponse(BaseModel):
 
 
 class ContentRequest(BaseModel):
+    client_id: str = Field(default="")
     goals: list[GoalType]
     channels: list[SocialChannel]
     posts_per_week: int = Field(default=4, ge=1, le=14)
@@ -66,6 +68,7 @@ class ContentWithDraftsResponse(BaseModel):
 
 
 class AdsRequest(BaseModel):
+    client_id: str = Field(default="")
     goals: list[GoalType]
     monthly_budget_eur: float = Field(default=1200, ge=100)
     topics: list[str] = Field(default_factory=list)
@@ -93,6 +96,7 @@ CampaignStatus = Literal["draft", "active", "paused", "completed", "archived"]
 
 
 class CampaignBatchCreateRequest(BaseModel):
+    client_id: str = ""
     name: str = Field(default="Batch campagne")
     notes: str = Field(default="")
     campaigns: list[CampaignIdea]
@@ -100,6 +104,7 @@ class CampaignBatchCreateRequest(BaseModel):
 
 class CampaignBatch(BaseModel):
     id: str
+    client_id: str = ""
     name: str
     created_by: str
     notes: str
@@ -108,6 +113,7 @@ class CampaignBatch(BaseModel):
 
 class CampaignRecord(CampaignIdea):
     id: str
+    client_id: str = ""
     batch_id: str
     status: CampaignStatus
     created_at: str
@@ -169,6 +175,7 @@ class PublishResponse(BaseModel):
 
 
 class AutomationDraftCreateRequest(BaseModel):
+    client_id: str = ""
     channel: str
     content: str
     scheduled_for: str | None = None
@@ -176,6 +183,7 @@ class AutomationDraftCreateRequest(BaseModel):
 
 class AutomationDraft(BaseModel):
     id: str
+    client_id: str = ""
     channel: str
     content: str
     status: str
@@ -237,6 +245,16 @@ class ClientProfile(BaseModel):
     city: str = ""
     unique_value: str = ""
     notes: str = ""
+    openai_api_key: str = ""
+    model_name: str = "gpt-4.1-mini"
+    require_human_approval: bool = True
+    autopublish_enabled: bool = False
+    whatsapp_enabled: bool = False
+    meta_access_token: str = ""
+    meta_page_id: str = ""
+    whatsapp_token: str = ""
+    whatsapp_phone_number_id: str = ""
+    whatsapp_to: str = ""
     created_at: str
     updated_at: str
 
@@ -248,3 +266,13 @@ class ClientProfileUpsert(BaseModel):
     city: str = ""
     unique_value: str = ""
     notes: str = ""
+    openai_api_key: str = ""
+    model_name: str = "gpt-4.1-mini"
+    require_human_approval: bool = True
+    autopublish_enabled: bool = False
+    whatsapp_enabled: bool = False
+    meta_access_token: str = ""
+    meta_page_id: str = ""
+    whatsapp_token: str = ""
+    whatsapp_phone_number_id: str = ""
+    whatsapp_to: str = ""

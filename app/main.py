@@ -104,12 +104,14 @@ def login(payload: LoginRequest) -> LoginResponse:
 
 @app.post("/api/v1/strategy/generate", response_model=StrategyResponse)
 def generate_strategy(payload: StrategyRequest) -> StrategyResponse:
-    return service.generate_strategy(payload)
+    cfg = client_service.get(payload.client_id) if payload.client_id else None
+    return service.generate_strategy(payload, runtime_config=cfg or {})
 
 
 @app.post("/api/v1/content/generate-posts", response_model=ContentResponse)
 def generate_posts(payload: ContentRequest) -> ContentResponse:
-    return service.generate_posts(payload)
+    cfg = client_service.get(payload.client_id) if payload.client_id else None
+    return service.generate_posts(payload, runtime_config=cfg or {})
 
 
 @app.post("/api/v1/content/generate-posts-and-drafts", response_model=ContentWithDraftsResponse)
@@ -117,15 +119,20 @@ def generate_posts_and_create_drafts(
     payload: ContentRequest, user: dict = Depends(get_current_user)
 ) -> ContentWithDraftsResponse:
     require_roles(user, {"admin", "editor"})
-    result = service.generate_posts(payload)
-    created = automation_service.create_drafts_from_posts([item.model_dump() for item in result.post_ideas])
+    cfg = client_service.get(payload.client_id) if payload.client_id else None
+    result = service.generate_posts(payload, runtime_config=cfg or {})
+    created = automation_service.create_drafts_from_posts(
+        [item.model_dump() for item in result.post_ideas],
+        client_id=payload.client_id,
+    )
     audit_service.log(user["username"], "generate_posts_and_drafts", f"{len(created)} bozze create")
     return ContentWithDraftsResponse(post_ideas=result.post_ideas, created_drafts=[AutomationDraft(**d) for d in created])
 
 
 @app.post("/api/v1/ads/generate-campaigns", response_model=AdsResponse)
 def generate_campaigns(payload: AdsRequest) -> AdsResponse:
-    return service.generate_campaigns(payload)
+    cfg = client_service.get(payload.client_id) if payload.client_id else None
+    return service.generate_campaigns(payload, runtime_config=cfg or {})
 
 
 @app.post("/api/v1/campaigns/batches", response_model=CampaignBatchResponse)
@@ -134,6 +141,7 @@ def create_campaign_batch(
 ) -> CampaignBatchResponse:
     require_roles(user, {"admin", "editor"})
     data = campaign_service.create_batch(
+        client_id=payload.client_id,
         name=payload.name,
         notes=payload.notes,
         created_by=user["username"],
@@ -146,19 +154,20 @@ def create_campaign_batch(
 
 
 @app.get("/api/v1/campaigns/batches", response_model=list[CampaignBatch])
-def list_campaign_batches(user: dict = Depends(get_current_user)) -> list[CampaignBatch]:
+def list_campaign_batches(user: dict = Depends(get_current_user), client_id: str | None = None) -> list[CampaignBatch]:
     require_roles(user, {"admin", "editor", "approver"})
-    return [CampaignBatch(**item) for item in campaign_service.list_batches()]
+    return [CampaignBatch(**item) for item in campaign_service.list_batches(client_id=client_id)]
 
 
 @app.get("/api/v1/campaigns", response_model=list[CampaignRecord])
 def list_campaigns(
     user: dict = Depends(get_current_user),
+    client_id: str | None = None,
     batch_id: str | None = None,
     status: str | None = None,
 ) -> list[CampaignRecord]:
     require_roles(user, {"admin", "editor", "approver"})
-    return [CampaignRecord(**item) for item in campaign_service.list_campaigns(batch_id=batch_id, status=status)]
+    return [CampaignRecord(**item) for item in campaign_service.list_campaigns(client_id=client_id, batch_id=batch_id, status=status)]
 
 
 @app.put("/api/v1/campaigns/{campaign_id}/status", response_model=CampaignRecord)
@@ -246,7 +255,7 @@ def publish_with_approval(payload: PublishRequest) -> PublishResponse:
 @app.post("/api/v1/automation/drafts", response_model=AutomationDraft)
 def create_automation_draft(payload: AutomationDraftCreateRequest, user: dict = Depends(get_current_user)) -> AutomationDraft:
     require_roles(user, {"admin", "editor"})
-    item = automation_service.create_draft(payload.channel, payload.content, payload.scheduled_for)
+    item = automation_service.create_draft(payload.channel, payload.content, payload.scheduled_for, client_id=payload.client_id)
     audit_service.log(user["username"], "create_draft", f"Draft {item['id']} creata")
     return AutomationDraft(**item)
 

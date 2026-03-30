@@ -191,13 +191,27 @@
         </section>
 
         <section class="card">
-          <h3>7) Crea bozza automazione</h3>
+          <h3>7) Calendario schedulazione</h3>
+          <label>Data inizio</label>
+          <input id="schStartDate" type="date" />
+          <label>Settimane</label>
+          <input id="schWeeks" type="number" value="4" />
+          <label>Canali (separati da virgola)</label>
+          <input id="schChannels" value="instagram,facebook" />
+          <label>Post a settimana</label>
+          <input id="schPostsPerWeek" type="number" value="4" />
+          <div class="actions"><button onclick="buildSchedule()">Genera calendario</button></div>
+          <div id="schOut" class="hint"></div>
+        </section>
+
+        <section class="card">
+          <h3>8) Crea bozza automazione</h3>
           <label>Canale</label>
           <select id="autoChannel">
             <option>instagram</option><option>facebook</option><option>whatsapp</option><option>tiktok</option>
           </select>
           <label>Contenuto</label>
-          <textarea id="autoContent">Post automatico ZenQi del giorno.</textarea>
+          <textarea id="autoContent">Post automatico del cliente del giorno.</textarea>
           <label>Data/Ora pubblicazione (ISO UTC, opzionale)</label>
           <input id="autoWhen" placeholder="2026-03-25T10:00:00+00:00" />
           <div class="actions">
@@ -208,7 +222,7 @@
         </section>
 
         <section class="card">
-          <h3>8) Approvazione e run</h3>
+          <h3>9) Approvazione e run</h3>
           <label>ID bozza</label>
           <input id="draftIdAction" placeholder="Incolla ID bozza da approvare/rifiutare" />
           <div class="actions">
@@ -220,7 +234,7 @@
         </section>
 
         <section class="card">
-          <h3>9) Dashboard KPI</h3>
+          <h3>10) Dashboard KPI</h3>
           <div class="actions"><button class="secondary" onclick="loadDashboard()">Aggiorna KPI</button></div>
           <div id="dashOut" class="hint"></div>
         </section>
@@ -248,7 +262,17 @@
         industry: $("ctxIndustry").value,
         city: $("ctxCity").value,
         unique_value: $("ctxValue").value,
-        notes: $("ctxNotes").value
+        notes: $("ctxNotes").value,
+        openai_api_key: $("cfgApiKey").value,
+        model_name: $("cfgModel").value,
+        require_human_approval: $("cfgApproval").checked,
+        autopublish_enabled: $("cfgAutopublish").checked,
+        whatsapp_enabled: $("cfgWhatsapp").checked,
+        meta_access_token: $("cfgMetaToken").value,
+        meta_page_id: $("cfgMetaPageId").value,
+        whatsapp_token: $("cfgWaToken").value,
+        whatsapp_phone_number_id: $("cfgWaPhoneId").value,
+        whatsapp_to: $("cfgWaTo").value
       });
 
       async function api(path, method = "GET", body = null) {
@@ -292,6 +316,16 @@
         $("ctxCity").value = c.city || "";
         $("ctxValue").value = c.unique_value || "";
         $("ctxNotes").value = c.notes || "";
+        $("cfgApiKey").value = c.openai_api_key || "";
+        $("cfgModel").value = c.model_name || "gpt-4.1-mini";
+        $("cfgApproval").checked = !!c.require_human_approval;
+        $("cfgAutopublish").checked = !!c.autopublish_enabled;
+        $("cfgWhatsapp").checked = !!c.whatsapp_enabled;
+        $("cfgMetaToken").value = c.meta_access_token || "";
+        $("cfgMetaPageId").value = c.meta_page_id || "";
+        $("cfgWaToken").value = c.whatsapp_token || "";
+        $("cfgWaPhoneId").value = c.whatsapp_phone_number_id || "";
+        $("cfgWaTo").value = c.whatsapp_to || "";
       }
 
       function newClientForm() {
@@ -336,7 +370,8 @@
 
       async function loadConfig() {
         try {
-          const cfg = await api("/api/v1/config");
+          if (!selectedClientId) throw new Error("Seleziona prima un cliente");
+          const cfg = await api(`/api/v1/clients/${selectedClientId}`);
           $("cfgApiKey").value = cfg.openai_api_key || "";
           $("cfgModel").value = cfg.model_name || "gpt-4.1-mini";
           $("cfgApproval").checked = !!cfg.require_human_approval;
@@ -357,23 +392,9 @@
       }
 
       async function saveConfig() {
-        try {
-          const payload = {
-            openai_api_key: $("cfgApiKey").value,
-            model_name: $("cfgModel").value,
-            require_human_approval: $("cfgApproval").checked,
-            autopublish_enabled: $("cfgAutopublish").checked,
-            whatsapp_enabled: $("cfgWhatsapp").checked,
-            meta_access_token: $("cfgMetaToken").value,
-            meta_page_id: $("cfgMetaPageId").value,
-            whatsapp_token: $("cfgWaToken").value,
-            whatsapp_phone_number_id: $("cfgWaPhoneId").value,
-            whatsapp_to: $("cfgWaTo").value
-          };
-          const result = await api("/api/v1/config", "PUT", payload);
-          showHtml("cfgOut", `<span class="ok">Configurazione salvata con successo.</span><br/>Modello: <strong>${result.model_name}</strong>`);
-          await loadAIStatus();
-        } catch (e) { showErr("cfgOut", e); }
+        await saveClient();
+        showHtml("cfgOut", `<span class="ok">Configurazione cliente salvata con successo.</span>`);
+        await loadAIStatus();
       }
 
       async function loadAIStatus() {
@@ -392,6 +413,7 @@
         try {
           const payload = {
             goals: [$("strGoal").value],
+            client_id: selectedClientId,
             monthly_budget_eur: Number($("strBudget").value || 0),
             prompt_instructions: $("strPrompt").value,
             context: getContext()
@@ -411,6 +433,7 @@
         try {
           const payload = {
             goals: splitCsv($("cntGoals").value),
+            client_id: selectedClientId,
             channels: splitCsv($("cntChannels").value),
             posts_per_week: Number($("cntPosts").value || 4),
             topics: splitCsv($("cntTopics").value),
@@ -445,6 +468,7 @@
         try {
           const payload = {
             goals: splitCsv($("adsGoals").value),
+            client_id: selectedClientId,
             monthly_budget_eur: Number($("adsBudget").value || 0),
             topics: splitCsv($("adsTopics").value),
             prompt_instructions: $("adsPrompt").value,
@@ -475,6 +499,7 @@
           if (!lastGeneratedCampaigns.length) throw new Error("Prima genera almeno una campagna.");
           const payload = {
             name: $("adsBatchName").value || "Batch campagne",
+            client_id: selectedClientId,
             notes: $("adsBatchNotes").value || "",
             campaigns: lastGeneratedCampaigns
           };
@@ -485,8 +510,8 @@
 
       async function loadCampaigns() {
         try {
-          const batches = await api("/api/v1/campaigns/batches");
-          const campaigns = await api("/api/v1/campaigns");
+          const batches = await api(`/api/v1/campaigns/batches?client_id=${encodeURIComponent(selectedClientId)}`);
+          const campaigns = await api(`/api/v1/campaigns?client_id=${encodeURIComponent(selectedClientId)}`);
           const rows = campaigns.slice(0, 20).map(c => `
             <tr>
               <td>${c.campaign_name}</td>
@@ -510,6 +535,7 @@
       async function createDraft() {
         try {
           const payload = {
+            client_id: selectedClientId,
             channel: $("autoChannel").value,
             content: $("autoContent").value,
             scheduled_for: $("autoWhen").value || null
@@ -529,6 +555,20 @@
             <ul>${drafts.slice(0, 10).map(d => `<li><button class="ghost" onclick="document.getElementById('draftIdAction').value='${d.id}'">Usa</button> ${d.channel.toUpperCase()} - ${d.status} - ${d.content.slice(0,80)}...</li>`).join("")}</ul>
           `);
         } catch (e) { showErr("autoOut", e); }
+      }
+
+      async function buildSchedule() {
+        try {
+          const payload = {
+            start_date: $("schStartDate").value || new Date().toISOString().slice(0, 10),
+            weeks: Number($("schWeeks").value || 4),
+            channels: splitCsv($("schChannels").value),
+            posts_per_week: Number($("schPostsPerWeek").value || 4)
+          };
+          const data = await api("/api/v1/scheduler/build", "POST", payload);
+          const rows = (data.items || []).slice(0, 40).map(i => `<tr><td>${i.publication_date}</td><td>${i.channel}</td><td>${i.slot}</td><td>${i.content_theme}</td></tr>`).join("");
+          showHtml("schOut", `<table style="width:100%;border-collapse:collapse;"><thead><tr><th>Data</th><th>Canale</th><th>Orario</th><th>Tema</th></tr></thead><tbody>${rows}</tbody></table>`);
+        } catch (e) { showErr("schOut", e); }
       }
 
       async function approveDraft() {
@@ -570,6 +610,7 @@
         $("apiBase").value = window.location.protocol.startsWith("http")
           ? window.location.origin
           : "http://127.0.0.1:8000";
+        $("schStartDate").value = new Date().toISOString().slice(0, 10);
         loadAIStatus();
       })();
     </script>
