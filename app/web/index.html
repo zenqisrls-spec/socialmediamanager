@@ -300,9 +300,9 @@
           });
           authToken = data.access_token;
           $("loginStatus").innerHTML = `<span class="ok">Accesso riuscito</span> (ruolo: ${data.role})`;
+          await loadClients();
           await loadConfig();
           await loadAIStatus();
-          await loadClients();
           await loadDashboard();
         } catch (e) {
           $("loginStatus").innerHTML = `<span class="err">Accesso fallito:</span> ${e}`;

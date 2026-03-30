@@ -7,7 +7,10 @@ from typing import Annotated
 from fastapi import Depends, FastAPI
 from fastapi import HTTPException
 from fastapi import Header
+from fastapi import Request
+from fastapi.responses import JSONResponse
 from fastapi.responses import FileResponse
+import logging
 
 from app.schemas import (
     AppConfig,
@@ -52,6 +55,7 @@ app = FastAPI(
     description="Automazione AI per contenuti social e campagne advertising.",
     version="0.1.0",
 )
+logger = logging.getLogger(__name__)
 
 service = MarketingService()
 config_service = AppConfigService()
@@ -82,6 +86,12 @@ def require_roles(user: dict, roles: set[str]) -> None:
 @app.get("/", include_in_schema=False)
 def web_ui() -> FileResponse:
     return FileResponse(WEB_INDEX)
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    logger.exception("Unhandled error on %s", request.url.path, exc_info=exc)
+    return JSONResponse(status_code=500, content={"detail": "Errore interno. Controlla i dati inseriti e riprova."})
 
 
 @app.get("/health")
