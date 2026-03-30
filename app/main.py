@@ -15,6 +15,7 @@ from app.schemas import (
     AdsResponse,
     ContentRequest,
     ContentResponse,
+    ContentWithDraftsResponse,
     AutomationDraft,
     AutomationDraftCreateRequest,
     AutomationRunResponse,
@@ -30,11 +31,17 @@ from app.schemas import (
     ScheduleResponse,
     StrategyRequest,
     StrategyResponse,
+    CampaignBatchCreateRequest,
+    CampaignBatchResponse,
+    CampaignBatch,
+    CampaignRecord,
+    CampaignStatusUpdateRequest,
 )
 from app.services.app_config_service import AppConfigService
 from app.services.audit_service import AuditService
 from app.services.auth_service import AuthService
 from app.services.automation_service import AutomationService
+from app.services.campaign_service import CampaignService
 from app.services.marketing_service import MarketingService
 
 app = FastAPI(
@@ -48,6 +55,7 @@ config_service = AppConfigService()
 automation_service = AutomationService()
 auth_service = AuthService()
 audit_service = AuditService()
+campaign_service = CampaignService()
 WEB_INDEX = Path(__file__).resolve().parent / "web" / "index.html"
 automation_task: asyncio.Task | None = None
 
@@ -100,9 +108,65 @@ def generate_posts(payload: ContentRequest) -> ContentResponse:
     return service.generate_posts(payload)
 
 
+@app.post("/api/v1/content/generate-posts-and-drafts", response_model=ContentWithDraftsResponse)
+def generate_posts_and_create_drafts(
+    payload: ContentRequest, user: dict = Depends(get_current_user)
+) -> ContentWithDraftsResponse:
+    require_roles(user, {"admin", "editor"})
+    result = service.generate_posts(payload)
+    created = automation_service.create_drafts_from_posts([item.model_dump() for item in result.post_ideas])
+    audit_service.log(user["username"], "generate_posts_and_drafts", f"{len(created)} bozze create")
+    return ContentWithDraftsResponse(post_ideas=result.post_ideas, created_drafts=[AutomationDraft(**d) for d in created])
+
+
 @app.post("/api/v1/ads/generate-campaigns", response_model=AdsResponse)
 def generate_campaigns(payload: AdsRequest) -> AdsResponse:
     return service.generate_campaigns(payload)
+
+
+@app.post("/api/v1/campaigns/batches", response_model=CampaignBatchResponse)
+def create_campaign_batch(
+    payload: CampaignBatchCreateRequest, user: dict = Depends(get_current_user)
+) -> CampaignBatchResponse:
+    require_roles(user, {"admin", "editor"})
+    data = campaign_service.create_batch(
+        name=payload.name,
+        notes=payload.notes,
+        created_by=user["username"],
+        campaigns=[item.model_dump() for item in payload.campaigns],
+    )
+    audit_service.log(user["username"], "create_campaign_batch", f"Batch {data['batch_id']} creata")
+    return CampaignBatchResponse(
+        **data, campaigns=[CampaignRecord(**item) for item in data["campaigns"]]
+    )
+
+
+@app.get("/api/v1/campaigns/batches", response_model=list[CampaignBatch])
+def list_campaign_batches(user: dict = Depends(get_current_user)) -> list[CampaignBatch]:
+    require_roles(user, {"admin", "editor", "approver"})
+    return [CampaignBatch(**item) for item in campaign_service.list_batches()]
+
+
+@app.get("/api/v1/campaigns", response_model=list[CampaignRecord])
+def list_campaigns(
+    user: dict = Depends(get_current_user),
+    batch_id: str | None = None,
+    status: str | None = None,
+) -> list[CampaignRecord]:
+    require_roles(user, {"admin", "editor", "approver"})
+    return [CampaignRecord(**item) for item in campaign_service.list_campaigns(batch_id=batch_id, status=status)]
+
+
+@app.put("/api/v1/campaigns/{campaign_id}/status", response_model=CampaignRecord)
+def update_campaign_status(
+    campaign_id: str, payload: CampaignStatusUpdateRequest, user: dict = Depends(get_current_user)
+) -> CampaignRecord:
+    require_roles(user, {"admin", "editor"})
+    updated = campaign_service.update_campaign_status(campaign_id, payload.status)
+    if not updated:
+        raise HTTPException(status_code=404, detail="Campagna non trovata")
+    audit_service.log(user["username"], "update_campaign_status", f"{campaign_id} -> {payload.status}")
+    return CampaignRecord(**updated)
 
 
 @app.post("/api/v1/scheduler/build", response_model=ScheduleResponse)

@@ -149,6 +149,7 @@
           <input id="cntPosts" type="number" value="4" />
           <label>Argomenti dei post (separati da virgola)</label>
           <input id="cntTopics" placeholder="es: meditazione, sonno, respirazione" />
+          <label><input id="cntAutoDrafts" type="checkbox" /> Crea automaticamente bozze dopo la generazione</label>
           <div class="actions"><button onclick="generateContent()">Genera post</button></div>
           <div id="cntOut" class="hint"></div>
         </section>
@@ -161,7 +162,15 @@
           <input id="adsBudget" type="number" value="1500" />
           <label>Argomenti campagne (separati da virgola)</label>
           <input id="adsTopics" placeholder="es: gestione stress, percorsi detox" />
-          <div class="actions"><button onclick="generateAds()">Genera campagne</button></div>
+          <label>Nome batch campagne</label>
+          <input id="adsBatchName" value="Batch campagne del giorno" />
+          <label>Note batch (opzionale)</label>
+          <input id="adsBatchNotes" />
+          <div class="actions">
+            <button onclick="generateAds()">Genera campagne</button>
+            <button class="secondary" onclick="saveGeneratedAdsBatch()">Salva batch</button>
+            <button class="ghost" onclick="loadCampaigns()">Storico campagne</button>
+          </div>
           <div id="adsOut" class="hint"></div>
         </section>
 
@@ -204,6 +213,7 @@
 
     <script>
       let authToken = "";
+      let lastGeneratedCampaigns = [];
       const $ = (id) => document.getElementById(id);
       const splitCsv = (v) => v.split(",").map(x => x.trim()).filter(Boolean);
       const baseUrl = () => $("apiBase").value.replace(/\/$/, "");
@@ -329,9 +339,14 @@
             topics: splitCsv($("cntTopics").value),
             context: getContext()
           };
-          const data = await api("/api/v1/content/generate-posts", "POST", payload);
+          const path = $("cntAutoDrafts").checked
+            ? "/api/v1/content/generate-posts-and-drafts"
+            : "/api/v1/content/generate-posts";
+          const data = await api(path, "POST", payload);
           showHtml("cntOut",
-            data.post_ideas.map((p, i) => `
+            `
+            ${$("cntAutoDrafts").checked ? `<div><strong>Bozze create automaticamente:</strong> ${(data.created_drafts || []).length}</div><br/>` : ""}
+            ${(data.post_ideas || []).map((p, i) => `
               <div style="background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:8px;margin-bottom:8px;">
                 <strong>Post ${i + 1} — ${p.channel.toUpperCase()} (${p.content_type})</strong><br/>
                 <em>Obiettivo:</em> ${p.objective}<br/>
@@ -339,7 +354,8 @@
                 <em>Testo:</em> ${p.caption}<br/>
                 <em>CTA:</em> ${p.call_to_action}
               </div>
-            `).join("")
+            `).join("")}
+            `
           );
         } catch (e) { showErr("cntOut", e); }
       }
@@ -353,6 +369,7 @@
             context: getContext()
           };
           const data = await api("/api/v1/ads/generate-campaigns", "POST", payload);
+          lastGeneratedCampaigns = data.campaigns || [];
           showHtml("adsOut",
             data.campaigns.map((c, i) => `
               <div style="background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:8px;margin-bottom:8px;">
@@ -366,6 +383,31 @@
               </div>
             `).join("")
           );
+        } catch (e) { showErr("adsOut", e); }
+      }
+
+      async function saveGeneratedAdsBatch() {
+        try {
+          if (!lastGeneratedCampaigns.length) throw new Error("Prima genera almeno una campagna.");
+          const payload = {
+            name: $("adsBatchName").value || "Batch campagne",
+            notes: $("adsBatchNotes").value || "",
+            campaigns: lastGeneratedCampaigns
+          };
+          const data = await api("/api/v1/campaigns/batches", "POST", payload);
+          showHtml("adsOut", `<span class="ok">Batch salvato.</span><br/>ID batch: <strong>${data.batch_id}</strong><br/>Campagne: ${data.campaigns.length}`);
+        } catch (e) { showErr("adsOut", e); }
+      }
+
+      async function loadCampaigns() {
+        try {
+          const batches = await api("/api/v1/campaigns/batches");
+          const campaigns = await api("/api/v1/campaigns");
+          showHtml("adsOut", `
+            <strong>Batch salvati:</strong> ${batches.length}<br/>
+            <strong>Campagne storicizzate:</strong> ${campaigns.length}<br/>
+            <pre>${JSON.stringify(campaigns.slice(0, 8), null, 2)}</pre>
+          `);
         } catch (e) { showErr("adsOut", e); }
       }
 

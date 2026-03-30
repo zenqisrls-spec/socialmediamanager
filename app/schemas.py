@@ -56,6 +56,11 @@ class ContentResponse(BaseModel):
     post_ideas: list[PostIdea]
 
 
+class ContentWithDraftsResponse(BaseModel):
+    post_ideas: list[PostIdea]
+    created_drafts: list["AutomationDraft"]
+
+
 class AdsRequest(BaseModel):
     goals: list[GoalType]
     monthly_budget_eur: float = Field(default=1200, ge=100)
@@ -76,6 +81,44 @@ class CampaignIdea(BaseModel):
 
 class AdsResponse(BaseModel):
     campaigns: list[CampaignIdea]
+
+
+CampaignStatus = Literal["draft", "active", "paused", "completed", "archived"]
+
+
+class CampaignBatchCreateRequest(BaseModel):
+    name: str = Field(default="Batch campagne")
+    notes: str = Field(default="")
+    campaigns: list[CampaignIdea]
+
+
+class CampaignBatch(BaseModel):
+    id: str
+    name: str
+    created_by: str
+    notes: str
+    created_at: str
+
+
+class CampaignRecord(CampaignIdea):
+    id: str
+    batch_id: str
+    status: CampaignStatus
+    created_at: str
+    updated_at: str
+
+
+class CampaignBatchResponse(BaseModel):
+    batch_id: str
+    name: str
+    notes: str
+    created_by: str
+    created_at: str
+    campaigns: list[CampaignRecord]
+
+
+class CampaignStatusUpdateRequest(BaseModel):
+    status: CampaignStatus
 
 
 class ScheduleRequest(BaseModel):

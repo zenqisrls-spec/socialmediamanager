@@ -52,6 +52,31 @@ class DBService:
                     published_at TEXT NOT NULL
                 );
 
+                CREATE TABLE IF NOT EXISTS campaign_batches (
+                    id TEXT PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    created_by TEXT NOT NULL,
+                    notes TEXT NOT NULL,
+                    created_at TEXT NOT NULL
+                );
+
+                CREATE TABLE IF NOT EXISTS campaigns (
+                    id TEXT PRIMARY KEY,
+                    batch_id TEXT NOT NULL,
+                    platform TEXT NOT NULL,
+                    campaign_name TEXT NOT NULL,
+                    objective TEXT NOT NULL,
+                    target_audience TEXT NOT NULL,
+                    daily_budget_eur REAL NOT NULL,
+                    ad_copy TEXT NOT NULL,
+                    creative_direction TEXT NOT NULL,
+                    kpi_target TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL,
+                    FOREIGN KEY(batch_id) REFERENCES campaign_batches(id)
+                );
+
                 CREATE TABLE IF NOT EXISTS users (
                     username TEXT PRIMARY KEY,
                     password TEXT NOT NULL,
@@ -82,4 +107,3 @@ class DBService:
                 "INSERT OR IGNORE INTO users(username, password, role) VALUES ('editor', 'editor123', 'editor')"
             )
             conn.commit()
-

@@ -54,6 +54,19 @@ class AutomationService:
             conn.commit()
         return item
 
+    def create_drafts_from_posts(self, posts: list[dict[str, Any]], scheduled_for: str | None = None) -> list[dict[str, Any]]:
+        created = []
+        for post in posts:
+            content = f"{post.get('hook', '')}\n\n{post.get('caption', '')}\n\nCTA: {post.get('call_to_action', '')}".strip()
+            created.append(
+                self.create_draft(
+                    channel=post.get("channel", "instagram"),
+                    content=content,
+                    scheduled_for=scheduled_for,
+                )
+            )
+        return created
+
     def list_drafts(self, status: str | None = None) -> list[dict[str, Any]]:
         with self.db.connect() as conn:
             if status:
@@ -138,4 +151,3 @@ class AutomationService:
             "drafts_by_status": by_status,
             "drafts_by_channel": by_channel,
         }
-

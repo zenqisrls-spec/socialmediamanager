@@ -5,6 +5,7 @@ from app.services.app_config_service import AppConfigService
 from app.services.ai_service import AIService
 from app.services.auth_service import AuthService
 from app.services.automation_service import AutomationService
+from app.services.campaign_service import CampaignService
 from app.services.marketing_service import MarketingService
 from app.schemas import AdsRequest, BusinessContext
 
@@ -91,3 +92,63 @@ def test_generate_campaigns_fallback_uses_payload_inputs(monkeypatch):
     assert "LotusLab" in result.campaigns[0].campaign_name
     assert "Milano" in result.campaigns[0].target_audience
     assert "detox" in result.campaigns[0].ad_copy.lower()
+
+
+def test_create_drafts_from_generated_posts():
+    automation = AutomationService()
+    created = automation.create_drafts_from_posts(
+        [
+            {
+                "channel": "instagram",
+                "hook": "Hook 1",
+                "caption": "Caption 1",
+                "call_to_action": "CTA 1",
+            },
+            {
+                "channel": "facebook",
+                "hook": "Hook 2",
+                "caption": "Caption 2",
+                "call_to_action": "CTA 2",
+            },
+        ]
+    )
+    assert len(created) == 2
+    assert created[0]["channel"] == "instagram"
+    assert "Caption 1" in created[0]["content"]
+
+
+def test_campaign_batch_storage_and_status_update():
+    service = CampaignService()
+    created = service.create_batch(
+        name="Batch Test",
+        notes="note",
+        created_by="admin",
+        campaigns=[
+            {
+                "platform": "Meta Ads",
+                "campaign_name": "Campagna A",
+                "objective": "Lead generation",
+                "target_audience": "Target A",
+                "daily_budget_eur": 30.0,
+                "ad_copy": "copy A",
+                "creative_direction": "creative A",
+                "kpi_target": "CPL < 10",
+            },
+            {
+                "platform": "Google Ads",
+                "campaign_name": "Campagna B",
+                "objective": "Brand awareness",
+                "target_audience": "Target B",
+                "daily_budget_eur": 20.0,
+                "ad_copy": "copy B",
+                "creative_direction": "creative B",
+                "kpi_target": "CTR > 3%",
+            },
+        ],
+    )
+    assert created["name"] == "Batch Test"
+    campaigns = service.list_campaigns(batch_id=created["batch_id"])
+    assert len(campaigns) == 2
+    updated = service.update_campaign_status(campaigns[0]["id"], "active")
+    assert updated is not None
+    assert updated["status"] == "active"

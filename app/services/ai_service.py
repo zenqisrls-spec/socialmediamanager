@@ -5,11 +5,7 @@ import importlib.util
 import os
 from typing import Any
 
-from dotenv import load_dotenv
-
 from app.services.app_config_service import AppConfigService
-
-load_dotenv()
 
 
 class AIService:
