@@ -96,31 +96,39 @@ class MarketingService:
 
     def generate_campaigns(self, payload: AdsRequest) -> AdsResponse:
         daily_budget = round(payload.monthly_budget_eur / 30, 2)
-        campaign_topic = payload.topics[0] if payload.topics else "benessere olistico personalizzato"
-        fallback = {
-            "campaigns": [
-                {
-                    "platform": "Meta Ads",
-                    "campaign_name": "ZenQi Lead - Consulenza Olistica",
-                    "objective": "Lead generation",
-                    "target_audience": "Donne e uomini 28-55 interessati a yoga, mindfulness, benessere naturale in area Roma",
-                    "daily_budget_eur": daily_budget,
-                    "ad_copy": f"Ritrova equilibrio e benessere con un percorso personalizzato ZenQi su: {campaign_topic}.",
-                    "creative_direction": "Video breve con testimonianza + scene ambiente del centro",
-                    "kpi_target": "Costo per lead < 12 EUR",
-                },
-                {
-                    "platform": "Google Ads",
-                    "campaign_name": "ZenQi Search - Trattamenti Olistici Roma",
-                    "objective": "Conversione prenotazioni",
-                    "target_audience": "Persone che cercano trattamenti olistici e riduzione stress a Roma",
-                    "daily_budget_eur": daily_budget,
-                    "ad_copy": f"Centro olistico a Roma: percorsi su misura su {campaign_topic}.",
-                    "creative_direction": "Annunci search con estensioni call e sitelink",
-                    "kpi_target": "Tasso conversione landing > 6%",
-                },
-            ]
+        topics = payload.topics or ["benessere olistico personalizzato"]
+        brand = payload.context.brand_name
+        city = payload.context.city
+        value = payload.context.unique_value
+
+        objective_labels = {
+            "lead_generation": "Lead generation",
+            "awareness": "Brand awareness",
+            "retention": "Retention",
         }
+
+        campaigns = []
+        for idx, goal in enumerate(payload.goals):
+            topic = topics[idx % len(topics)]
+            platform = "Meta Ads" if idx % 2 == 0 else "Google Ads"
+            campaigns.append(
+                {
+                    "platform": platform,
+                    "campaign_name": f"{brand} - {objective_labels.get(goal, goal)} - {topic.title()}",
+                    "objective": objective_labels.get(goal, goal),
+                    "target_audience": f"Persone interessate a {topic} in area {city}",
+                    "daily_budget_eur": daily_budget,
+                    "ad_copy": f"{brand}: {value}. Scopri il percorso su {topic} a {city}.",
+                    "creative_direction": (
+                        "Video verticale con testimonianza locale e CTA prenotazione"
+                        if platform == "Meta Ads"
+                        else "Annunci search geolocalizzati con estensioni di chiamata"
+                    ),
+                    "kpi_target": "Costo per lead < 12 EUR" if goal == "lead_generation" else "CTR > 3.5%",
+                }
+            )
+
+        fallback = {"campaigns": campaigns}
         result = self.ai.generate_json(
             "Sei un media buyer senior. Rispondi in JSON valido.",
             f"Genera campagne per: {self._payload_json(payload)}",

@@ -16,20 +16,41 @@ class AIService:
     """Wrapper minimale per usare OpenAI con fallback locale deterministico."""
 
     def __init__(self) -> None:
-        config = AppConfigService().load()
-        self.model = os.getenv("MODEL_NAME") or config.get("model_name", "gpt-4.1-mini")
-        self.api_key = os.getenv("OPENAI_API_KEY") or config.get("openai_api_key")
+        self.config_service = AppConfigService()
+
+    def _resolve_runtime_config(self) -> tuple[str, str]:
+        config = self.config_service.load()
+        model = os.getenv("MODEL_NAME") or config.get("model_name", "gpt-4.1-mini")
+        api_key = os.getenv("OPENAI_API_KEY") or config.get("openai_api_key", "")
+        return model, api_key
+
+    @staticmethod
+    def _normalize_json_content(content: str) -> str:
+        raw = content.strip()
+        if raw.startswith("```"):
+            lines = raw.splitlines()
+            if lines and lines[0].startswith("```"):
+                lines = lines[1:]
+            if lines and lines[-1].strip() == "```":
+                lines = lines[:-1]
+            raw = "\n".join(lines).strip()
+        return raw
+
+    @staticmethod
+    def _create_client(api_key: str) -> Any:
+        from openai import OpenAI
+
+        return OpenAI(api_key=api_key)
 
     def generate_json(self, system_prompt: str, user_prompt: str, fallback: dict[str, Any]) -> dict[str, Any]:
-        if not self.api_key:
+        model, api_key = self._resolve_runtime_config()
+        if not api_key:
             return fallback
 
         try:
-            from openai import OpenAI
-
-            client = OpenAI(api_key=self.api_key)
+            client = self._create_client(api_key=api_key)
             completion = client.chat.completions.create(
-                model=self.model,
+                model=model,
                 response_format={"type": "json_object"},
                 messages=[
                     {"role": "system", "content": system_prompt},
@@ -40,12 +61,14 @@ class AIService:
             content = completion.choices[0].message.content
             if not content:
                 return fallback
-            return json.loads(content)
+            normalized = self._normalize_json_content(content)
+            return json.loads(normalized)
         except Exception:
             return fallback
 
     def status(self) -> dict[str, bool]:
+        _, api_key = self._resolve_runtime_config()
         return {
-            "api_key_configured": bool(self.api_key),
+            "api_key_configured": bool(api_key),
             "openai_package_available": importlib.util.find_spec("openai") is not None,
         }
