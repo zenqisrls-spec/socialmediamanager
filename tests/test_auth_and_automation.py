@@ -7,7 +7,7 @@ from app.services.auth_service import AuthService
 from app.services.automation_service import AutomationService
 from app.services.campaign_service import CampaignService
 from app.services.marketing_service import MarketingService
-from app.schemas import AdsRequest, BusinessContext
+from app.schemas import AdsRequest, BusinessContext, StrategyRequest
 
 
 def test_login_and_token_validation():
@@ -153,3 +153,23 @@ def test_campaign_batch_storage_and_status_update():
     updated = service.update_campaign_status(campaigns[0]["id"], "active")
     assert updated is not None
     assert updated["status"] == "active"
+
+
+def test_strategy_generation_falls_back_when_ai_returns_invalid_shape(monkeypatch):
+    service = MarketingService()
+
+    def bad_generate_json(*args, **kwargs):
+        return {"unexpected": "shape"}
+
+    monkeypatch.setattr(service.ai, "generate_json", bad_generate_json)
+    result = service.generate_strategy(
+        StrategyRequest(
+            client_id="",
+            goals=["awareness"],
+            monthly_budget_eur=1200,
+            prompt_instructions="test",
+            context=BusinessContext(brand_name="ClienteX", city="Milano"),
+        )
+    )
+    assert result.strategic_positioning
+    assert len(result.monthly_pillars) > 0

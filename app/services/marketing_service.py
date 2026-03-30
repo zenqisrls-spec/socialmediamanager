@@ -67,7 +67,10 @@ class MarketingService:
             fallback,
             runtime_config=runtime_config,
         )
-        return StrategyResponse(**result)
+        try:
+            return StrategyResponse(**result)
+        except Exception:
+            return StrategyResponse(**fallback)
 
     def generate_posts(self, payload: ContentRequest, runtime_config: dict | None = None) -> ContentResponse:
         fallback_posts = []
@@ -103,7 +106,13 @@ class MarketingService:
         for item in result.get("post_ideas", []):
             if not item.get("image_url"):
                 item["image_url"] = self.ai.generate_image_url(item.get("image_prompt", "social media image"), runtime_config=runtime_config)
-        parsed = [PostIdea(**item) for item in result["post_ideas"]]
+        raw_posts = result.get("post_ideas", [])
+        parsed = []
+        for idx, item in enumerate(raw_posts):
+            try:
+                parsed.append(PostIdea(**item))
+            except Exception:
+                parsed.append(PostIdea(**fallback_posts[idx % len(fallback_posts)]))
         return ContentResponse(post_ideas=parsed)
 
     def generate_campaigns(self, payload: AdsRequest, runtime_config: dict | None = None) -> AdsResponse:
@@ -148,7 +157,14 @@ class MarketingService:
             fallback,
             runtime_config=runtime_config,
         )
-        return AdsResponse(campaigns=[CampaignIdea(**item) for item in result["campaigns"]])
+        raw_campaigns = result.get("campaigns", [])
+        parsed_campaigns = []
+        for idx, item in enumerate(raw_campaigns):
+            try:
+                parsed_campaigns.append(CampaignIdea(**item))
+            except Exception:
+                parsed_campaigns.append(CampaignIdea(**campaigns[idx % len(campaigns)]))
+        return AdsResponse(campaigns=parsed_campaigns)
 
     def build_schedule(self, payload: ScheduleRequest) -> ScheduleResponse:
         slots = ["09:00", "13:00", "18:30", "21:00"]
