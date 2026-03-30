@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>ZenQi Social Media Manager</title>
+    <title>Social Media Manager Pro</title>
     <style>
       :root {
         --bg: #f5f7fb;
@@ -60,8 +60,8 @@
   <body>
     <div class="wrap">
       <div class="hero">
-        <h1>ZenQi Social Media Manager</h1>
-        <p>Versione semplificata per utenti non tecnici: form guidati, workflow chiaro e risultati leggibili.</p>
+        <h1>Social Media Manager Pro</h1>
+        <p>Gestione multi-cliente: strategie, contenuti, campagne e automazioni in un unico flusso operativo.</p>
       </div>
 
       <div class="card" style="margin-bottom: 16px;">
@@ -79,17 +79,27 @@
 
       <div class="grid">
         <section class="card">
-          <h3>Profilo Centro (personalizzazione)</h3>
+          <h3>Profilo Cliente (multi-account)</h3>
+          <label>Cliente selezionato</label>
+          <select id="clientSelect"></select>
+          <div class="actions">
+            <button class="secondary" onclick="loadClients()">Aggiorna clienti</button>
+            <button class="ghost" onclick="newClientForm()">Nuovo cliente</button>
+            <button onclick="saveClient()">Salva cliente</button>
+          </div>
+          <div id="clientOut" class="hint"></div>
           <label>Nome centro</label>
-          <input id="ctxBrand" value="ZenQi SRLS" />
+          <input id="ctxBrand" value="Brand Cliente" />
           <label>Sito web</label>
-          <input id="ctxWebsite" value="https://zenqi.it" />
+          <input id="ctxWebsite" value="https://example.com" />
           <label>Settore</label>
-          <input id="ctxIndustry" value="Centro olistico" />
+          <input id="ctxIndustry" value="Servizi" />
           <label>Città / zona</label>
-          <input id="ctxCity" value="Toscana" />
+          <input id="ctxCity" value="Italia" />
           <label>Valore distintivo</label>
-          <textarea id="ctxValue">Percorsi olistici personalizzati per benessere fisico, mentale ed energetico</textarea>
+          <textarea id="ctxValue">Proposta di valore unica del cliente</textarea>
+          <label>Note operative cliente</label>
+          <textarea id="ctxNotes"></textarea>
           <p class="hint">Questi dati verranno usati per personalizzare strategie, post e campagne.</p>
         </section>
 
@@ -135,6 +145,8 @@
           </select>
           <label>Budget mensile (€)</label>
           <input id="strBudget" type="number" value="1200" />
+          <label>Prompt extra strategia (obbligatorio)</label>
+          <textarea id="strPrompt" placeholder="Es: focalizzati su lead B2B premium, evita tono promozionale aggressivo"></textarea>
           <div class="actions"><button onclick="generateStrategy()">Genera strategia</button></div>
           <div id="strOut" class="hint"></div>
         </section>
@@ -149,6 +161,8 @@
           <input id="cntPosts" type="number" value="4" />
           <label>Argomenti dei post (separati da virgola)</label>
           <input id="cntTopics" placeholder="es: meditazione, sonno, respirazione" />
+          <label>Prompt extra contenuti (obbligatorio)</label>
+          <textarea id="cntPrompt" placeholder="Es: crea 4 post educativi con CTA soft e inserisci idea immagine per ogni post"></textarea>
           <label><input id="cntAutoDrafts" type="checkbox" /> Crea automaticamente bozze dopo la generazione</label>
           <div class="actions"><button onclick="generateContent()">Genera post</button></div>
           <div id="cntOut" class="hint"></div>
@@ -162,6 +176,8 @@
           <input id="adsBudget" type="number" value="1500" />
           <label>Argomenti campagne (separati da virgola)</label>
           <input id="adsTopics" placeholder="es: gestione stress, percorsi detox" />
+          <label>Prompt extra ADS (obbligatorio)</label>
+          <textarea id="adsPrompt" placeholder="Es: crea varianti per prospecting e retargeting con taglio professionale"></textarea>
           <label>Nome batch campagne</label>
           <input id="adsBatchName" value="Batch campagne del giorno" />
           <label>Note batch (opzionale)</label>
@@ -214,6 +230,7 @@
     <script>
       let authToken = "";
       let lastGeneratedCampaigns = [];
+      let selectedClientId = "";
       const $ = (id) => document.getElementById(id);
       const splitCsv = (v) => v.split(",").map(x => x.trim()).filter(Boolean);
       const baseUrl = () => $("apiBase").value.replace(/\/$/, "");
@@ -224,6 +241,14 @@
         industry: $("ctxIndustry").value,
         city: $("ctxCity").value,
         unique_value: $("ctxValue").value
+      });
+      const clientPayload = () => ({
+        name: $("ctxBrand").value,
+        website: $("ctxWebsite").value,
+        industry: $("ctxIndustry").value,
+        city: $("ctxCity").value,
+        unique_value: $("ctxValue").value,
+        notes: $("ctxNotes").value
       });
 
       async function api(path, method = "GET", body = null) {
@@ -253,10 +278,60 @@
           $("loginStatus").innerHTML = `<span class="ok">Accesso riuscito</span> (ruolo: ${data.role})`;
           await loadConfig();
           await loadAIStatus();
+          await loadClients();
           await loadDashboard();
         } catch (e) {
           $("loginStatus").innerHTML = `<span class="err">Accesso fallito:</span> ${e}`;
         }
+      }
+
+      function fillClientForm(c) {
+        $("ctxBrand").value = c.name || "";
+        $("ctxWebsite").value = c.website || "";
+        $("ctxIndustry").value = c.industry || "";
+        $("ctxCity").value = c.city || "";
+        $("ctxValue").value = c.unique_value || "";
+        $("ctxNotes").value = c.notes || "";
+      }
+
+      function newClientForm() {
+        selectedClientId = "";
+        fillClientForm({ name: "", website: "", industry: "", city: "", unique_value: "", notes: "" });
+        $("clientOut").textContent = "Nuovo cliente: compila i campi e premi Salva cliente.";
+      }
+
+      async function loadClients() {
+        try {
+          const clients = await api("/api/v1/clients");
+          const sel = $("clientSelect");
+          sel.innerHTML = clients.length
+            ? clients.map(c => `<option value="${c.id}">${c.name} — ${c.city}</option>`).join("")
+            : `<option value="">Nessun cliente</option>`;
+          if (clients.length) {
+            selectedClientId = clients[0].id;
+            fillClientForm(clients[0]);
+          }
+          sel.onchange = async () => {
+            selectedClientId = sel.value;
+            if (!selectedClientId) return;
+            const c = await api(`/api/v1/clients/${selectedClientId}`);
+            fillClientForm(c);
+          };
+          $("clientOut").textContent = `Clienti caricati: ${clients.length}`;
+        } catch (e) { showErr("clientOut", e); }
+      }
+
+      async function saveClient() {
+        try {
+          const payload = clientPayload();
+          if (!payload.name.trim()) throw new Error("Nome cliente obbligatorio");
+          const path = selectedClientId ? `/api/v1/clients/${selectedClientId}` : "/api/v1/clients";
+          const method = selectedClientId ? "PUT" : "POST";
+          const data = await api(path, method, payload);
+          selectedClientId = data.id;
+          await loadClients();
+          $("clientOut").innerHTML = `<span class="ok">Cliente salvato</span>: ${data.name}`;
+        } catch (e) { showErr("clientOut", e); }
       }
 
       async function loadConfig() {
@@ -318,8 +393,10 @@
           const payload = {
             goals: [$("strGoal").value],
             monthly_budget_eur: Number($("strBudget").value || 0),
+            prompt_instructions: $("strPrompt").value,
             context: getContext()
           };
+          if (!payload.prompt_instructions.trim()) throw new Error("Prompt strategia obbligatorio");
           const data = await api("/api/v1/strategy/generate", "POST", payload);
           showHtml("strOut", `
             <strong>Posizionamento:</strong> ${data.strategic_positioning}<br/><br/>
@@ -337,8 +414,10 @@
             channels: splitCsv($("cntChannels").value),
             posts_per_week: Number($("cntPosts").value || 4),
             topics: splitCsv($("cntTopics").value),
+            prompt_instructions: $("cntPrompt").value,
             context: getContext()
           };
+          if (!payload.prompt_instructions.trim()) throw new Error("Prompt contenuti obbligatorio");
           const path = $("cntAutoDrafts").checked
             ? "/api/v1/content/generate-posts-and-drafts"
             : "/api/v1/content/generate-posts";
@@ -353,6 +432,8 @@
                 <em>Hook:</em> ${p.hook}<br/>
                 <em>Testo:</em> ${p.caption}<br/>
                 <em>CTA:</em> ${p.call_to_action}
+                <br/><em>Prompt immagine:</em> ${p.image_prompt || "-"}
+                <br/><em>URL immagine:</em> ${p.image_url || "-"}
               </div>
             `).join("")}
             `
@@ -366,8 +447,10 @@
             goals: splitCsv($("adsGoals").value),
             monthly_budget_eur: Number($("adsBudget").value || 0),
             topics: splitCsv($("adsTopics").value),
+            prompt_instructions: $("adsPrompt").value,
             context: getContext()
           };
+          if (!payload.prompt_instructions.trim()) throw new Error("Prompt ADS obbligatorio");
           const data = await api("/api/v1/ads/generate-campaigns", "POST", payload);
           lastGeneratedCampaigns = data.campaigns || [];
           showHtml("adsOut",
@@ -379,7 +462,8 @@
                 <em>Target:</em> ${c.target_audience}<br/>
                 <em>Budget giornaliero:</em> € ${c.daily_budget_eur}<br/>
                 <em>Messaggio:</em> ${c.ad_copy}<br/>
-                <em>KPI:</em> ${c.kpi_target}
+                <em>KPI:</em> ${c.kpi_target}<br/>
+                <em>Brief immagine:</em> ${c.creative_brief_image || "-"}
               </div>
             `).join("")
           );
@@ -403,10 +487,22 @@
         try {
           const batches = await api("/api/v1/campaigns/batches");
           const campaigns = await api("/api/v1/campaigns");
+          const rows = campaigns.slice(0, 20).map(c => `
+            <tr>
+              <td>${c.campaign_name}</td>
+              <td>${c.platform}</td>
+              <td>${c.status}</td>
+              <td>${c.objective}</td>
+              <td>€ ${c.daily_budget_eur}</td>
+            </tr>
+          `).join("");
           showHtml("adsOut", `
             <strong>Batch salvati:</strong> ${batches.length}<br/>
             <strong>Campagne storicizzate:</strong> ${campaigns.length}<br/>
-            <pre>${JSON.stringify(campaigns.slice(0, 8), null, 2)}</pre>
+            <table style="width:100%;border-collapse:collapse;margin-top:8px;">
+              <thead><tr><th style="text-align:left;">Nome</th><th style="text-align:left;">Piattaforma</th><th style="text-align:left;">Stato</th><th style="text-align:left;">Obiettivo</th><th style="text-align:left;">Budget</th></tr></thead>
+              <tbody>${rows}</tbody>
+            </table>
           `);
         } catch (e) { showErr("adsOut", e); }
       }
@@ -429,8 +525,8 @@
           showHtml("autoOut", `
             <strong>Bozze attive:</strong> ${drafts.length}<br/>
             <strong>Pubblicazioni storiche:</strong> ${published.length}<br/>
-            <small>Clicca una bozza e copia l'ID nel campo approvazione.</small>
-            <pre>${JSON.stringify(drafts.slice(0, 5), null, 2)}</pre>
+            <small>Seleziona una bozza per approvare/rifiutare:</small>
+            <ul>${drafts.slice(0, 10).map(d => `<li><button class="ghost" onclick="document.getElementById('draftIdAction').value='${d.id}'">Usa</button> ${d.channel.toUpperCase()} - ${d.status} - ${d.content.slice(0,80)}...</li>`).join("")}</ul>
           `);
         } catch (e) { showErr("autoOut", e); }
       }

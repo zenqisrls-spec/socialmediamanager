@@ -71,10 +71,23 @@ class DBService:
                     ad_copy TEXT NOT NULL,
                     creative_direction TEXT NOT NULL,
                     kpi_target TEXT NOT NULL,
+                    creative_brief_image TEXT NOT NULL DEFAULT '',
                     status TEXT NOT NULL,
                     created_at TEXT NOT NULL,
                     updated_at TEXT NOT NULL,
                     FOREIGN KEY(batch_id) REFERENCES campaign_batches(id)
+                );
+
+                CREATE TABLE IF NOT EXISTS clients (
+                    id TEXT PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    website TEXT NOT NULL,
+                    industry TEXT NOT NULL,
+                    city TEXT NOT NULL,
+                    unique_value TEXT NOT NULL,
+                    notes TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
                 );
 
                 CREATE TABLE IF NOT EXISTS users (
@@ -92,6 +105,9 @@ class DBService:
                 );
                 """
             )
+            columns = [r[1] for r in conn.execute("PRAGMA table_info(campaigns)").fetchall()]
+            if "creative_brief_image" not in columns:
+                conn.execute("ALTER TABLE campaigns ADD COLUMN creative_brief_image TEXT NOT NULL DEFAULT ''")
             conn.execute(
                 """
                 INSERT OR IGNORE INTO app_config(id) VALUES (1)

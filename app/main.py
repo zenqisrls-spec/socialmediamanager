@@ -36,6 +36,8 @@ from app.schemas import (
     CampaignBatch,
     CampaignRecord,
     CampaignStatusUpdateRequest,
+    ClientProfile,
+    ClientProfileUpsert,
 )
 from app.services.app_config_service import AppConfigService
 from app.services.audit_service import AuditService
@@ -43,6 +45,7 @@ from app.services.auth_service import AuthService
 from app.services.automation_service import AutomationService
 from app.services.campaign_service import CampaignService
 from app.services.marketing_service import MarketingService
+from app.services.client_service import ClientService
 
 app = FastAPI(
     title="ZenQi Social Media Manager API",
@@ -56,6 +59,7 @@ automation_service = AutomationService()
 auth_service = AuthService()
 audit_service = AuditService()
 campaign_service = CampaignService()
+client_service = ClientService()
 WEB_INDEX = Path(__file__).resolve().parent / "web" / "index.html"
 automation_task: asyncio.Task | None = None
 
@@ -177,6 +181,39 @@ def build_schedule(payload: ScheduleRequest) -> ScheduleResponse:
 @app.get("/api/v1/config", response_model=AppConfig)
 def get_config() -> AppConfig:
     return AppConfig(**config_service.load())
+
+
+@app.get("/api/v1/clients", response_model=list[ClientProfile])
+def list_clients(user: dict = Depends(get_current_user)) -> list[ClientProfile]:
+    require_roles(user, {"admin", "editor", "approver"})
+    return [ClientProfile(**item) for item in client_service.list()]
+
+
+@app.post("/api/v1/clients", response_model=ClientProfile)
+def create_client(payload: ClientProfileUpsert, user: dict = Depends(get_current_user)) -> ClientProfile:
+    require_roles(user, {"admin", "editor"})
+    created = client_service.create(payload.model_dump())
+    audit_service.log(user["username"], "create_client", f"Client {created['id']} creato")
+    return ClientProfile(**created)
+
+
+@app.get("/api/v1/clients/{client_id}", response_model=ClientProfile)
+def get_client(client_id: str, user: dict = Depends(get_current_user)) -> ClientProfile:
+    require_roles(user, {"admin", "editor", "approver"})
+    item = client_service.get(client_id)
+    if not item:
+        raise HTTPException(status_code=404, detail="Cliente non trovato")
+    return ClientProfile(**item)
+
+
+@app.put("/api/v1/clients/{client_id}", response_model=ClientProfile)
+def update_client(client_id: str, payload: ClientProfileUpsert, user: dict = Depends(get_current_user)) -> ClientProfile:
+    require_roles(user, {"admin", "editor"})
+    updated = client_service.update(client_id, payload.model_dump())
+    if not updated:
+        raise HTTPException(status_code=404, detail="Cliente non trovato")
+    audit_service.log(user["username"], "update_client", f"Client {client_id} aggiornato")
+    return ClientProfile(**updated)
 
 
 @app.put("/api/v1/config", response_model=AppConfig)

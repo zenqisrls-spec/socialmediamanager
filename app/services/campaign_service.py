@@ -37,6 +37,7 @@ class CampaignService:
                     "ad_copy": c["ad_copy"],
                     "creative_direction": c["creative_direction"],
                     "kpi_target": c["kpi_target"],
+                    "creative_brief_image": c.get("creative_brief_image", ""),
                     "status": "draft",
                     "created_at": created_at,
                     "updated_at": created_at,
@@ -45,9 +46,9 @@ class CampaignService:
                     """
                     INSERT INTO campaigns(
                         id, batch_id, platform, campaign_name, objective, target_audience,
-                        daily_budget_eur, ad_copy, creative_direction, kpi_target,
+                        daily_budget_eur, ad_copy, creative_direction, kpi_target, creative_brief_image,
                         status, created_at, updated_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         item["id"],
@@ -60,6 +61,7 @@ class CampaignService:
                         item["ad_copy"],
                         item["creative_direction"],
                         item["kpi_target"],
+                        item["creative_brief_image"],
                         item["status"],
                         item["created_at"],
                         item["updated_at"],

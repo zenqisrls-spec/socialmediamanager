@@ -31,8 +31,10 @@ class MarketingService:
         return str(payload)
 
     def generate_strategy(self, payload: StrategyRequest) -> StrategyResponse:
+        brand = payload.context.brand_name
+        city = payload.context.city
         fallback = {
-            "strategic_positioning": "ZenQi come riferimento locale per percorsi olistici integrati e personalizzati.",
+            "strategic_positioning": f"{brand} come riferimento locale per {payload.context.industry} in area {city}, con proposta distintiva centrata su {payload.context.unique_value}.",
             "monthly_pillars": [
                 "Educazione al benessere olistico",
                 "Testimonianze clienti e casi reali",
@@ -61,7 +63,7 @@ class MarketingService:
 
         result = self.ai.generate_json(
             "Sei un marketing strategist senior per centri olistici. Rispondi in JSON valido.",
-            f"Genera una strategia per: {self._payload_json(payload)}",
+            f"Genera una strategia per: {self._payload_json(payload)}. Indicazioni extra: {payload.prompt_instructions}",
             fallback,
         )
         return StrategyResponse(**result)
@@ -80,15 +82,17 @@ class MarketingService:
                     "content_type": content_types[idx % len(content_types)],
                     "hook": f"{topic.title()}: 3 segnali da non ignorare ({idx + 1})",
                     "caption": f"Scopri una pratica semplice su '{topic}' da inserire oggi per ridurre stress e ritrovare energia.",
-                    "call_to_action": "Prenota la tua consulenza olistica su zenqi.it",
+                    "call_to_action": f"Prenota ora da {payload.context.brand_name} - {payload.context.website}",
                     "objective": goal,
+                    "image_prompt": f"Foto professionale lifestyle su tema {topic}, brand {payload.context.brand_name}, città {payload.context.city}, stile naturale.",
+                    "image_url": "",
                 }
             )
 
         fallback = {"post_ideas": fallback_posts}
         result = self.ai.generate_json(
             "Sei un social media manager per un centro olistico. Rispondi in JSON valido.",
-            f"Crea idee post social per: {self._payload_json(payload)}",
+            f"Crea idee post social per: {self._payload_json(payload)}. Indicazioni extra: {payload.prompt_instructions}. Includi anche image_prompt e image_url (se disponibile).",
             fallback,
         )
         parsed = [PostIdea(**item) for item in result["post_ideas"]]
@@ -125,13 +129,14 @@ class MarketingService:
                         else "Annunci search geolocalizzati con estensioni di chiamata"
                     ),
                     "kpi_target": "Costo per lead < 12 EUR" if goal == "lead_generation" else "CTR > 3.5%",
+                    "creative_brief_image": f"Visual campagna su {topic} ambientato a {city}, focus su risultato cliente e brand {brand}.",
                 }
             )
 
         fallback = {"campaigns": campaigns}
         result = self.ai.generate_json(
             "Sei un media buyer senior. Rispondi in JSON valido.",
-            f"Genera campagne per: {self._payload_json(payload)}",
+            f"Genera campagne per: {self._payload_json(payload)}. Indicazioni extra: {payload.prompt_instructions}. Includi creative_brief_image.",
             fallback,
         )
         return AdsResponse(campaigns=[CampaignIdea(**item) for item in result["campaigns"]])

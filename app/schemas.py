@@ -11,18 +11,19 @@ GoalType = Literal["awareness", "lead_generation", "retention"]
 
 
 class BusinessContext(BaseModel):
-    brand_name: str = Field(default="ZenQi SRLS")
-    website: str = Field(default="https://zenqi.it")
-    industry: str = Field(default="Centro olistico")
-    city: str = Field(default="Roma")
+    brand_name: str = Field(default="Brand Cliente")
+    website: str = Field(default="https://example.com")
+    industry: str = Field(default="Servizi")
+    city: str = Field(default="Italia")
     unique_value: str = Field(
-        default="Percorsi olistici personalizzati per benessere fisico, mentale ed energetico"
+        default="Proposta di valore unica del cliente"
     )
 
 
 class StrategyRequest(BaseModel):
     goals: list[GoalType] = Field(default_factory=lambda: ["awareness", "retention"])
     monthly_budget_eur: float = Field(default=1200, ge=0)
+    prompt_instructions: str = Field(default="")
     context: BusinessContext = Field(default_factory=BusinessContext)
 
 
@@ -40,6 +41,7 @@ class ContentRequest(BaseModel):
     posts_per_week: int = Field(default=4, ge=1, le=14)
     topics: list[str] = Field(default_factory=list)
     tone_of_voice: str = Field(default="Empatico, autorevole, rassicurante")
+    prompt_instructions: str = Field(default="")
     context: BusinessContext = Field(default_factory=BusinessContext)
 
 
@@ -50,6 +52,8 @@ class PostIdea(BaseModel):
     caption: str
     call_to_action: str
     objective: GoalType
+    image_prompt: str = ""
+    image_url: str = ""
 
 
 class ContentResponse(BaseModel):
@@ -65,6 +69,7 @@ class AdsRequest(BaseModel):
     goals: list[GoalType]
     monthly_budget_eur: float = Field(default=1200, ge=100)
     topics: list[str] = Field(default_factory=list)
+    prompt_instructions: str = Field(default="")
     context: BusinessContext = Field(default_factory=BusinessContext)
 
 
@@ -77,6 +82,7 @@ class CampaignIdea(BaseModel):
     ad_copy: str
     creative_direction: str
     kpi_target: str
+    creative_brief_image: str = ""
 
 
 class AdsResponse(BaseModel):
@@ -221,3 +227,24 @@ class AuditLogItem(BaseModel):
 class AIStatus(BaseModel):
     api_key_configured: bool
     openai_package_available: bool
+
+
+class ClientProfile(BaseModel):
+    id: str
+    name: str
+    website: str = ""
+    industry: str = ""
+    city: str = ""
+    unique_value: str = ""
+    notes: str = ""
+    created_at: str
+    updated_at: str
+
+
+class ClientProfileUpsert(BaseModel):
+    name: str
+    website: str = ""
+    industry: str = ""
+    city: str = ""
+    unique_value: str = ""
+    notes: str = ""
