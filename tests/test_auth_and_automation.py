@@ -188,9 +188,11 @@ def test_content_generation_uses_fallback_when_ai_returns_empty(monkeypatch):
             goals=["awareness"],
             channels=["instagram"],
             posts_per_week=2,
+            include_images=False,
             topics=["shiatsu"],
             prompt_instructions="test",
             context=BusinessContext(brand_name="ClienteY", website="https://y.it", city="Roma"),
         )
     )
     assert len(result.post_ideas) == 2
+    assert result.post_ideas[0].final_post_text

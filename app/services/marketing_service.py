@@ -92,6 +92,14 @@ class MarketingService:
                     "image_url": self.ai.generate_image_url(
                         f"Immagine social per {payload.context.brand_name} su {topic} in {payload.context.city}",
                         runtime_config=runtime_config,
+                    )
+                    if payload.include_images
+                    else "",
+                    "final_post_text": (
+                        f"{topic.title()} | {payload.context.brand_name}\n\n"
+                        f"Per {payload.context.city}: {goal}.\n"
+                        f"{payload.context.unique_value}\n\n"
+                        f"{payload.context.website}"
                     ),
                 }
             )
@@ -104,8 +112,10 @@ class MarketingService:
             runtime_config=runtime_config,
         )
         for item in result.get("post_ideas", []):
-            if not item.get("image_url"):
+            if payload.include_images and not item.get("image_url"):
                 item["image_url"] = self.ai.generate_image_url(item.get("image_prompt", "social media image"), runtime_config=runtime_config)
+            if not item.get("final_post_text"):
+                item["final_post_text"] = f"{item.get('hook','')}\n\n{item.get('caption','')}\n\n{item.get('call_to_action','')}"
         raw_posts = result.get("post_ideas", []) or fallback_posts
         parsed = []
         for idx, item in enumerate(raw_posts):

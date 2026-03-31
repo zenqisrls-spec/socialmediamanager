@@ -163,6 +163,7 @@
           <input id="cntTopics" placeholder="es: meditazione, sonno, respirazione" />
           <label>Prompt extra contenuti (obbligatorio)</label>
           <textarea id="cntPrompt" placeholder="Es: crea 4 post educativi con CTA soft e inserisci idea immagine per ogni post"></textarea>
+          <label><input id="cntIncludeImages" type="checkbox" /> Genera immagini (più lento)</label>
           <label><input id="cntAutoDrafts" type="checkbox" /> Crea automaticamente bozze dopo la generazione</label>
           <div class="actions"><button onclick="generateContent()">Genera post</button></div>
           <div id="cntOut" class="hint"></div>
@@ -445,6 +446,7 @@
             client_id: selectedClientId,
             channels: splitCsv($("cntChannels").value),
             posts_per_week: Number($("cntPosts").value || 4),
+            include_images: $("cntIncludeImages").checked,
             topics: splitCsv($("cntTopics").value),
             prompt_instructions: $("cntPrompt").value,
             context: getContext()
@@ -470,6 +472,9 @@
                 <em>CTA:</em> ${p.call_to_action}
                 <br/><em>Prompt immagine:</em> ${p.image_prompt || "-"}
                 <br/><em>URL immagine:</em> ${p.image_url || "-"}
+                ${p.image_url ? `<br/><img src="${p.image_url}" alt="anteprima" style="max-width:220px;border-radius:6px;margin-top:6px;" />` : ""}
+                <br/><br/><strong>Versione finale modificabile:</strong>
+                <textarea style="margin-top:4px;">${p.final_post_text || `${p.hook}\n\n${p.caption}\n\n${p.call_to_action}`}</textarea>
               </div>
             `).join("")}
             `

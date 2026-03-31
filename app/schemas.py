@@ -41,6 +41,7 @@ class ContentRequest(BaseModel):
     goals: list[GoalType]
     channels: list[SocialChannel]
     posts_per_week: int = Field(default=4, ge=1, le=14)
+    include_images: bool = Field(default=False)
     topics: list[str] = Field(default_factory=list)
     tone_of_voice: str = Field(default="Empatico, autorevole, rassicurante")
     prompt_instructions: str = Field(default="")
@@ -56,6 +57,7 @@ class PostIdea(BaseModel):
     objective: GoalType
     image_prompt: str = ""
     image_url: str = ""
+    final_post_text: str = ""
 
 
 class ContentResponse(BaseModel):
