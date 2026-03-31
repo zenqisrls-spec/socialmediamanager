@@ -439,6 +439,7 @@
 
       async function generateContent() {
         try {
+          showHtml("cntOut", "Generazione contenuti in corso...");
           const payload = {
             goals: splitCsv($("cntGoals").value),
             client_id: selectedClientId,
@@ -453,6 +454,10 @@
             ? "/api/v1/content/generate-posts-and-drafts"
             : "/api/v1/content/generate-posts";
           const data = await api(path, "POST", payload);
+          if (!data.post_ideas || !data.post_ideas.length) {
+            showHtml("cntOut", `<span class="err">Nessun post generato. Verifica prompt/parametri e riprova.</span>`);
+            return;
+          }
           showHtml("cntOut",
             `
             ${$("cntAutoDrafts").checked ? `<div><strong>Bozze create automaticamente:</strong> ${(data.created_drafts || []).length}</div><br/>` : ""}
@@ -474,6 +479,7 @@
 
       async function generateAds() {
         try {
+          showHtml("adsOut", "Generazione campagne in corso...");
           const payload = {
             goals: splitCsv($("adsGoals").value),
             client_id: selectedClientId,
@@ -484,6 +490,10 @@
           };
           if (!payload.prompt_instructions.trim()) throw new Error("Prompt ADS obbligatorio");
           const data = await api("/api/v1/ads/generate-campaigns", "POST", payload);
+          if (!data.campaigns || !data.campaigns.length) {
+            showHtml("adsOut", `<span class="err">Nessuna campagna generata. Verifica prompt/parametri e riprova.</span>`);
+            return;
+          }
           lastGeneratedCampaigns = data.campaigns || [];
           showHtml("adsOut",
             data.campaigns.map((c, i) => `

@@ -7,7 +7,7 @@ from app.services.auth_service import AuthService
 from app.services.automation_service import AutomationService
 from app.services.campaign_service import CampaignService
 from app.services.marketing_service import MarketingService
-from app.schemas import AdsRequest, BusinessContext, StrategyRequest
+from app.schemas import AdsRequest, BusinessContext, ContentRequest, StrategyRequest
 
 
 def test_login_and_token_validation():
@@ -173,3 +173,24 @@ def test_strategy_generation_falls_back_when_ai_returns_invalid_shape(monkeypatc
     )
     assert result.strategic_positioning
     assert len(result.monthly_pillars) > 0
+
+
+def test_content_generation_uses_fallback_when_ai_returns_empty(monkeypatch):
+    service = MarketingService()
+
+    def empty_generate_json(*args, **kwargs):
+        return {}
+
+    monkeypatch.setattr(service.ai, "generate_json", empty_generate_json)
+    result = service.generate_posts(
+        payload=ContentRequest(
+            client_id="",
+            goals=["awareness"],
+            channels=["instagram"],
+            posts_per_week=2,
+            topics=["shiatsu"],
+            prompt_instructions="test",
+            context=BusinessContext(brand_name="ClienteY", website="https://y.it", city="Roma"),
+        )
+    )
+    assert len(result.post_ideas) == 2

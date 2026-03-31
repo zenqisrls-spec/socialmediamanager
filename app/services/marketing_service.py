@@ -106,7 +106,7 @@ class MarketingService:
         for item in result.get("post_ideas", []):
             if not item.get("image_url"):
                 item["image_url"] = self.ai.generate_image_url(item.get("image_prompt", "social media image"), runtime_config=runtime_config)
-        raw_posts = result.get("post_ideas", [])
+        raw_posts = result.get("post_ideas", []) or fallback_posts
         parsed = []
         for idx, item in enumerate(raw_posts):
             try:
@@ -157,7 +157,7 @@ class MarketingService:
             fallback,
             runtime_config=runtime_config,
         )
-        raw_campaigns = result.get("campaigns", [])
+        raw_campaigns = result.get("campaigns", []) or campaigns
         parsed_campaigns = []
         for idx, item in enumerate(raw_campaigns):
             try:
