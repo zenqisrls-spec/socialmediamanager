@@ -84,6 +84,8 @@ class AIService:
                 data = getattr(response, "data", None) or []
                 if data and getattr(data[0], "url", None):
                     return str(data[0].url)
+                if data and getattr(data[0], "b64_json", None):
+                    return f"data:image/png;base64,{data[0].b64_json}"
             except Exception:
                 pass
         return f"https://picsum.photos/seed/{quote_plus(prompt)}/1024/1024"

@@ -161,8 +161,8 @@
           <input id="cntPosts" type="number" value="4" />
           <label>Argomenti dei post (separati da virgola)</label>
           <input id="cntTopics" placeholder="es: meditazione, sonno, respirazione" />
-          <label>Prompt extra contenuti (obbligatorio)</label>
-          <textarea id="cntPrompt" placeholder="Es: crea 4 post educativi con CTA soft e inserisci idea immagine per ogni post"></textarea>
+          <label>Brief contenuti (obbligatorio)</label>
+          <textarea id="cntPrompt" placeholder="Es: target donne 30-50 in Toscana, tono premium ma umano, obiettivo prenotazione prova, evita frasi generiche"></textarea>
           <label><input id="cntIncludeImages" type="checkbox" /> Genera immagini (più lento)</label>
           <label><input id="cntAutoDrafts" type="checkbox" /> Crea automaticamente bozze dopo la generazione</label>
           <div class="actions"><button onclick="generateContent()">Genera post</button></div>
@@ -177,7 +177,7 @@
           <input id="adsBudget" type="number" value="1500" />
           <label>Argomenti campagne (separati da virgola)</label>
           <input id="adsTopics" placeholder="es: gestione stress, percorsi detox" />
-          <label>Prompt extra ADS (obbligatorio)</label>
+          <label>Brief ADS (obbligatorio)</label>
           <textarea id="adsPrompt" placeholder="Es: crea varianti per prospecting e retargeting con taglio professionale"></textarea>
           <label>Nome batch campagne</label>
           <input id="adsBatchName" value="Batch campagne del giorno" />
@@ -467,14 +467,12 @@
               <div style="background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:8px;margin-bottom:8px;">
                 <strong>Post ${i + 1} — ${p.channel.toUpperCase()} (${p.content_type})</strong><br/>
                 <em>Obiettivo:</em> ${p.objective}<br/>
-                <em>Hook:</em> ${p.hook}<br/>
-                <em>Testo:</em> ${p.caption}<br/>
-                <em>CTA:</em> ${p.call_to_action}
-                <br/><em>Prompt immagine:</em> ${p.image_prompt || "-"}
-                <br/><em>URL immagine:</em> ${p.image_url || "-"}
                 ${p.image_url ? `<br/><img src="${p.image_url}" alt="anteprima" style="max-width:220px;border-radius:6px;margin-top:6px;" />` : ""}
                 <br/><br/><strong>Versione finale modificabile:</strong>
-                <textarea style="margin-top:4px;">${p.final_post_text || `${p.hook}\n\n${p.caption}\n\n${p.call_to_action}`}</textarea>
+                <textarea style="margin-top:4px;min-height:140px;">${p.final_post_text || `${p.hook}\n\n${p.caption}\n\n${p.call_to_action}`}</textarea>
+                <div style="margin-top:6px;"><strong>Hashtag consigliati:</strong> ${(p.hashtags || []).join(" ") || "-"}</div>
+                <div style="margin-top:4px;"><small>Stile visivo: ${p.visual_style || "-"}</small></div>
+                ${p.image_prompt ? `<details style="margin-top:6px;"><summary>Dettaglio creativo immagine</summary><small>${p.image_prompt}</small></details>` : ""}
               </div>
             `).join("")}
             `

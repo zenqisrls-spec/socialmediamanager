@@ -58,6 +58,8 @@ class PostIdea(BaseModel):
     image_prompt: str = ""
     image_url: str = ""
     final_post_text: str = ""
+    hashtags: list[str] = Field(default_factory=list)
+    visual_style: str = ""
 
 
 class ContentResponse(BaseModel):
