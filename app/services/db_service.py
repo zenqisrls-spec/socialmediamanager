@@ -109,6 +109,13 @@ class DBService:
                     role TEXT NOT NULL
                 );
 
+                CREATE TABLE IF NOT EXISTS sessions (
+                    token TEXT PRIMARY KEY,
+                    username TEXT NOT NULL,
+                    role TEXT NOT NULL,
+                    expires_at TEXT NOT NULL
+                );
+
                 CREATE TABLE IF NOT EXISTS audit_logs (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     ts TEXT NOT NULL,

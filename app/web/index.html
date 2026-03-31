@@ -242,7 +242,7 @@
     </div>
 
     <script>
-      let authToken = "";
+      let authToken = localStorage.getItem("smm_token") || "";
       let lastGeneratedCampaigns = [];
       let selectedClientId = "";
       const $ = (id) => document.getElementById(id);
@@ -284,7 +284,14 @@
         const txt = await res.text();
         let data;
         try { data = txt ? JSON.parse(txt) : {}; } catch { data = { raw: txt }; }
-        if (!res.ok) throw new Error(`${res.status} - ${JSON.stringify(data)}`);
+        if (!res.ok) {
+          if (res.status === 401) {
+            authToken = "";
+            localStorage.removeItem("smm_token");
+            $("loginStatus").innerHTML = `<span class="err">Sessione scaduta:</span> effettua nuovamente l'accesso.`;
+          }
+          throw new Error(`${res.status} - ${JSON.stringify(data)}`);
+        }
         return data;
       }
 
@@ -299,6 +306,7 @@
             username: $("loginUser").value, password: $("loginPass").value
           });
           authToken = data.access_token;
+          localStorage.setItem("smm_token", authToken);
           $("loginStatus").innerHTML = `<span class="ok">Accesso riuscito</span> (ruolo: ${data.role})`;
           await loadClients();
           await loadConfig();

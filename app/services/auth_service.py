@@ -10,7 +10,6 @@ from app.services.db_service import DBService
 class AuthService:
     def __init__(self) -> None:
         self.db = DBService()
-        self.sessions: dict[str, dict[str, Any]] = {}
 
     def login(self, username: str, password: str) -> dict[str, str] | None:
         with self.db.connect() as conn:
@@ -21,19 +20,30 @@ class AuthService:
         if not row:
             return None
         token = secrets.token_urlsafe(32)
-        self.sessions[token] = {
-            "username": row["username"],
-            "role": row["role"],
-            "expires_at": datetime.now(timezone.utc) + timedelta(hours=8),
-        }
+        expires_at = (datetime.now(timezone.utc) + timedelta(hours=8)).isoformat()
+        with self.db.connect() as conn:
+            conn.execute("DELETE FROM sessions WHERE expires_at < ?", (datetime.now(timezone.utc).isoformat(),))
+            conn.execute(
+                "INSERT OR REPLACE INTO sessions(token, username, role, expires_at) VALUES (?, ?, ?, ?)",
+                (token, row["username"], row["role"], expires_at),
+            )
+            conn.commit()
         return {"access_token": token, "role": row["role"]}
 
     def validate(self, token: str) -> dict[str, Any] | None:
-        session = self.sessions.get(token)
-        if not session:
+        with self.db.connect() as conn:
+            conn.execute("DELETE FROM sessions WHERE expires_at < ?", (datetime.now(timezone.utc).isoformat(),))
+            row = conn.execute(
+                "SELECT username, role, expires_at FROM sessions WHERE token=?",
+                (token,),
+            ).fetchone()
+            conn.commit()
+        if not row:
             return None
-        if session["expires_at"] < datetime.now(timezone.utc):
-            self.sessions.pop(token, None)
+        expires_at = datetime.fromisoformat(row["expires_at"].replace("Z", "+00:00"))
+        if expires_at < datetime.now(timezone.utc):
+            with self.db.connect() as conn:
+                conn.execute("DELETE FROM sessions WHERE token=?", (token,))
+                conn.commit()
             return None
-        return session
-
+        return {"username": row["username"], "role": row["role"], "expires_at": expires_at}
