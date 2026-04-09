@@ -32,6 +32,7 @@ from app.schemas import (
     PublishResponse,
     ScheduleRequest,
     ScheduleResponse,
+    DraftScheduleRequest,
     StrategyRequest,
     StrategyResponse,
     CampaignBatchCreateRequest,
@@ -197,6 +198,32 @@ def build_schedule(payload: ScheduleRequest) -> ScheduleResponse:
     return service.build_schedule(payload)
 
 
+@app.post("/api/v1/scheduler/assign-drafts", response_model=ScheduleResponse)
+def assign_drafts_to_schedule(
+    payload: DraftScheduleRequest, user: dict = Depends(get_current_user)
+) -> ScheduleResponse:
+    require_roles(user, {"admin", "editor"})
+    scheduled = automation_service.schedule_drafts(
+        client_id=payload.client_id,
+        draft_ids=payload.draft_ids,
+        start_date_iso=payload.start_date.isoformat(),
+        posts_per_week=payload.posts_per_week,
+    )
+    items = [
+        {
+            "publication_date": item["scheduled_for"][:10],
+            "channel": item["channel"],
+            "slot": item["scheduled_for"][11:16],
+            "content_theme": "Post generato",
+            "draft_id": item["id"],
+            "content_preview": item["content"][:120],
+        }
+        for item in scheduled
+    ]
+    audit_service.log(user["username"], "assign_drafts_schedule", f"{len(items)} bozze pianificate")
+    return ScheduleResponse(items=items)
+
+
 @app.get("/api/v1/config", response_model=AppConfig)
 def get_config() -> AppConfig:
     return AppConfig(**config_service.load())
@@ -271,8 +298,8 @@ def create_automation_draft(payload: AutomationDraftCreateRequest, user: dict = 
 
 
 @app.get("/api/v1/automation/drafts", response_model=list[AutomationDraft])
-def get_automation_drafts(status: str | None = None) -> list[AutomationDraft]:
-    return [AutomationDraft(**item) for item in automation_service.list_drafts(status=status)]
+def get_automation_drafts(status: str | None = None, client_id: str | None = None) -> list[AutomationDraft]:
+    return [AutomationDraft(**item) for item in automation_service.list_drafts(status=status, client_id=client_id)]
 
 
 @app.post("/api/v1/automation/drafts/{draft_id}/approve", response_model=AutomationDraft)

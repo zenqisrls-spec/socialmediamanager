@@ -149,10 +149,19 @@ class ScheduleItem(BaseModel):
     channel: SocialChannel
     slot: str
     content_theme: str
+    draft_id: str = ""
+    content_preview: str = ""
 
 
 class ScheduleResponse(BaseModel):
     items: list[ScheduleItem]
+
+
+class DraftScheduleRequest(BaseModel):
+    client_id: str
+    draft_ids: list[str] = Field(default_factory=list)
+    start_date: date
+    posts_per_week: int = Field(default=4, ge=1, le=14)
 
 
 class AppConfig(BaseModel):

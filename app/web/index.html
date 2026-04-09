@@ -193,6 +193,7 @@
 
         <section class="card">
           <h3>7) Calendario schedulazione</h3>
+          <p class="hint">Qui pianifichi le bozze generate: selezionale nella sezione contenuti e poi assegnale al calendario.</p>
           <label>Data inizio</label>
           <input id="schStartDate" type="date" />
           <label>Settimane</label>
@@ -201,7 +202,10 @@
           <input id="schChannels" value="instagram,facebook" />
           <label>Post a settimana</label>
           <input id="schPostsPerWeek" type="number" value="4" />
-          <div class="actions"><button onclick="buildSchedule()">Genera calendario</button></div>
+          <div class="actions">
+            <button onclick="scheduleSelectedDrafts()">Pianifica bozze selezionate</button>
+            <button class="secondary" onclick="buildSchedule()">Calendario guida</button>
+          </div>
           <div id="schOut" class="hint"></div>
         </section>
 
@@ -246,6 +250,7 @@
       let authToken = localStorage.getItem("smm_token") || "";
       let lastGeneratedCampaigns = [];
       let selectedClientId = "";
+      let lastCreatedDraftIds = [];
       const $ = (id) => document.getElementById(id);
       const splitCsv = (v) => v.split(",").map(x => x.trim()).filter(Boolean);
       const baseUrl = () => $("apiBase").value.replace(/\/$/, "");
@@ -460,9 +465,22 @@
             showHtml("cntOut", `<span class="err">Nessun post generato. Verifica prompt/parametri e riprova.</span>`);
             return;
           }
+          lastCreatedDraftIds = (data.created_drafts || []).map((d) => d.id);
           showHtml("cntOut",
             `
             ${$("cntAutoDrafts").checked ? `<div><strong>Bozze create automaticamente:</strong> ${(data.created_drafts || []).length}</div><br/>` : ""}
+            ${$("cntAutoDrafts").checked ? `
+              <div style="margin-bottom:10px;">
+                <strong>Seleziona le bozze da pianificare:</strong><br/>
+                ${(data.created_drafts || []).map((d, i) => `
+                  <label style="display:block;color:#111827;margin-top:4px;">
+                    <input type="checkbox" class="draftCheck" value="${d.id}" checked />
+                    Bozza ${i + 1} (${d.channel}) — ID ${d.id.slice(0, 8)}...
+                  </label>
+                `).join("")}
+                <button class="ghost" style="margin-top:8px;" onclick="scheduleSelectedDrafts()">Pianifica nel calendario</button>
+              </div>
+            ` : ""}
             ${(data.post_ideas || []).map((p, i) => `
               <div style="background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:8px;margin-bottom:8px;">
                 <strong>Post ${i + 1} — ${p.channel.toUpperCase()} (${p.content_type})</strong><br/>
@@ -567,8 +585,9 @@
 
       async function loadDrafts() {
         try {
-          const drafts = await api("/api/v1/automation/drafts");
+          const drafts = await api(`/api/v1/automation/drafts?client_id=${encodeURIComponent(selectedClientId)}`);
           const published = await api("/api/v1/automation/published");
+          lastCreatedDraftIds = drafts.map(d => d.id);
           showHtml("autoOut", `
             <strong>Bozze attive:</strong> ${drafts.length}<br/>
             <strong>Pubblicazioni storiche:</strong> ${published.length}<br/>
@@ -576,6 +595,30 @@
             <ul>${drafts.slice(0, 10).map(d => `<li><button class="ghost" onclick="document.getElementById('draftIdAction').value='${d.id}'">Usa</button> ${d.channel.toUpperCase()} - ${d.status} - ${d.content.slice(0,80)}...</li>`).join("")}</ul>
           `);
         } catch (e) { showErr("autoOut", e); }
+      }
+
+      async function scheduleSelectedDrafts() {
+        try {
+          const checked = Array.from(document.querySelectorAll(".draftCheck:checked")).map((el) => el.value);
+          const selected = checked.length ? checked : lastCreatedDraftIds;
+          if (!selectedClientId) throw new Error("Seleziona prima un cliente.");
+          if (!selected.length) throw new Error("Nessuna bozza selezionata da pianificare.");
+          const payload = {
+            client_id: selectedClientId,
+            draft_ids: selected,
+            start_date: $("schStartDate").value || new Date().toISOString().slice(0, 10),
+            posts_per_week: Number($("schPostsPerWeek").value || 4),
+          };
+          const data = await api("/api/v1/scheduler/assign-drafts", "POST", payload);
+          const rows = (data.items || []).map(i => `<tr><td>${i.publication_date}</td><td>${i.channel}</td><td>${i.slot}</td><td>${i.content_preview || "-"}</td></tr>`).join("");
+          showHtml("schOut", `
+            <strong>Bozze pianificate:</strong> ${data.items.length}<br/>
+            <table style="width:100%;border-collapse:collapse;margin-top:8px;">
+              <thead><tr><th>Data</th><th>Canale</th><th>Orario</th><th>Anteprima contenuto</th></tr></thead>
+              <tbody>${rows}</tbody>
+            </table>
+          `);
+        } catch (e) { showErr("schOut", e); }
       }
 
       async function buildSchedule() {

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from app.services.db_service import DBService
@@ -74,13 +74,64 @@ class AutomationService:
             )
         return created
 
-    def list_drafts(self, status: str | None = None) -> list[dict[str, Any]]:
+    def list_drafts(self, status: str | None = None, client_id: str | None = None) -> list[dict[str, Any]]:
         with self.db.connect() as conn:
-            if status:
+            if status and client_id:
+                rows = conn.execute(
+                    "SELECT * FROM drafts WHERE status=? AND client_id=? ORDER BY created_at DESC",
+                    (status, client_id),
+                ).fetchall()
+            elif status:
                 rows = conn.execute("SELECT * FROM drafts WHERE status=? ORDER BY created_at DESC", (status,)).fetchall()
+            elif client_id:
+                rows = conn.execute("SELECT * FROM drafts WHERE client_id=? ORDER BY created_at DESC", (client_id,)).fetchall()
             else:
                 rows = conn.execute("SELECT * FROM drafts ORDER BY created_at DESC").fetchall()
         return [dict(r) for r in rows]
+
+    def schedule_drafts(
+        self,
+        *,
+        client_id: str,
+        draft_ids: list[str],
+        start_date_iso: str,
+        posts_per_week: int,
+    ) -> list[dict[str, Any]]:
+        eligible_statuses = {"pending_approval", "approved"}
+        with self.db.connect() as conn:
+            if draft_ids:
+                placeholders = ",".join("?" for _ in draft_ids)
+                rows = conn.execute(
+                    f"SELECT * FROM drafts WHERE client_id=? AND id IN ({placeholders}) ORDER BY created_at ASC",
+                    (client_id, *draft_ids),
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    "SELECT * FROM drafts WHERE client_id=? AND status IN ('pending_approval','approved') ORDER BY created_at ASC",
+                    (client_id,),
+                ).fetchall()
+
+            updated: list[dict[str, Any]] = []
+            slots = ["09:00:00+00:00", "13:00:00+00:00", "18:30:00+00:00", "21:00:00+00:00"]
+            for idx, row in enumerate(rows):
+                item = dict(row)
+                if item.get("status") not in eligible_statuses:
+                    continue
+                day_offset = idx // posts_per_week * 7 + (idx % posts_per_week)
+                slot = slots[idx % len(slots)]
+                scheduled_for = f"{start_date_iso}T{slot}"
+                if day_offset:
+                    dt = datetime.fromisoformat(f"{start_date_iso}T00:00:00+00:00")
+                    scheduled_for = (dt.replace(hour=0, minute=0, second=0) + timedelta(days=day_offset)).strftime("%Y-%m-%dT") + slot
+
+                conn.execute(
+                    "UPDATE drafts SET scheduled_for=?, updated_at=? WHERE id=?",
+                    (scheduled_for, _now_iso(), item["id"]),
+                )
+                item["scheduled_for"] = scheduled_for
+                updated.append(item)
+            conn.commit()
+        return updated
 
     def list_published(self) -> list[dict[str, Any]]:
         with self.db.connect() as conn:

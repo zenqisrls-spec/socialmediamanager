@@ -117,6 +117,22 @@ def test_create_drafts_from_generated_posts():
     assert "Caption 1" in created[0]["content"]
 
 
+def test_schedule_generated_drafts_for_client():
+    automation = AutomationService()
+    client_id = "client-test-schedule"
+    d1 = automation.create_draft("instagram", "Post A", None, client_id=client_id)
+    d2 = automation.create_draft("facebook", "Post B", None, client_id=client_id)
+    planned = automation.schedule_drafts(
+        client_id=client_id,
+        draft_ids=[d1["id"], d2["id"]],
+        start_date_iso="2026-04-10",
+        posts_per_week=2,
+    )
+    assert len(planned) == 2
+    assert planned[0]["scheduled_for"].startswith("2026-04-10T")
+    assert planned[1]["scheduled_for"].startswith("2026-04-11T")
+
+
 def test_campaign_batch_storage_and_status_update():
     service = CampaignService()
     created = service.create_batch(
