@@ -236,6 +236,7 @@
             <button class="ghost" onclick="runAutomation()">Esegui automazione ora</button>
           </div>
           <p class="hint">Suggerimento: usa i pulsanti Approva/Rifiuta direttamente dalla lista bozze, senza copiare ID.</p>
+          <div id="draftListOut" class="hint"></div>
           <div id="runOut" class="hint"></div>
         </section>
 
@@ -319,6 +320,8 @@
           await loadConfig();
           await loadAIStatus();
           await loadDashboard();
+          await loadDrafts();
+          await loadScheduledCalendar();
         } catch (e) {
           $("loginStatus").innerHTML = `<span class="err">Accesso fallito:</span> ${e}`;
         }
@@ -359,12 +362,16 @@
           if (clients.length) {
             selectedClientId = clients[0].id;
             fillClientForm(clients[0]);
+            await loadDrafts();
+            await loadScheduledCalendar();
           }
           sel.onchange = async () => {
             selectedClientId = sel.value;
             if (!selectedClientId) return;
             const c = await api(`/api/v1/clients/${selectedClientId}`);
             fillClientForm(c);
+            await loadDrafts();
+            await loadScheduledCalendar();
           };
           $("clientOut").textContent = `Clienti caricati: ${clients.length}`;
         } catch (e) { showErr("clientOut", e); }
@@ -584,6 +591,8 @@
             scheduled_for: $("autoWhen").value || null
           };
           show("autoOut", await api("/api/v1/automation/drafts", "POST", payload));
+          await loadDrafts();
+          await loadScheduledCalendar();
         } catch (e) { showErr("autoOut", e); }
       }
 
@@ -592,7 +601,7 @@
           const drafts = await api(`/api/v1/automation/drafts?client_id=${encodeURIComponent(selectedClientId)}`);
           const published = await api("/api/v1/automation/published");
           lastCreatedDraftIds = drafts.map(d => d.id);
-          showHtml("autoOut", `
+          showHtml("draftListOut", `
             <strong>Bozze attive:</strong> ${drafts.length}<br/>
             <strong>Pubblicazioni storiche:</strong> ${published.length}<br/>
             <small>Approva/Rifiuta dalla lista (nessun ID da inserire manualmente):</small>
@@ -614,6 +623,7 @@
               </tbody>
             </table>
           `);
+          showHtml("autoOut", `<span class="ok">Bozze aggiornate.</span>`);
         } catch (e) { showErr("autoOut", e); }
       }
 
@@ -630,9 +640,45 @@
             posts_per_week: Number($("schPostsPerWeek").value || 4),
           };
           const data = await api("/api/v1/scheduler/assign-drafts", "POST", payload);
+          localStorage.setItem(`smm_calendar_${selectedClientId}`, JSON.stringify(data.items || []));
           const rows = (data.items || []).map(i => `<tr><td>${i.publication_date}</td><td>${i.channel}</td><td>${i.slot}</td><td>${i.content_preview || "-"}</td></tr>`).join("");
           showHtml("schOut", `
             <strong>Bozze pianificate:</strong> ${data.items.length}<br/>
+            <table style="width:100%;border-collapse:collapse;margin-top:8px;">
+              <thead><tr><th>Data</th><th>Canale</th><th>Orario</th><th>Anteprima contenuto</th></tr></thead>
+              <tbody>${rows}</tbody>
+            </table>
+          `);
+        } catch (e) { showErr("schOut", e); }
+      }
+
+      async function loadScheduledCalendar() {
+        try {
+          if (!selectedClientId) return;
+          const drafts = await api(`/api/v1/automation/drafts?client_id=${encodeURIComponent(selectedClientId)}`);
+          const scheduled = drafts
+            .filter(d => d.scheduled_for && d.status !== "rejected")
+            .map(d => ({
+              publication_date: (d.scheduled_for || "").slice(0, 10),
+              slot: (d.scheduled_for || "").slice(11, 16),
+              channel: d.channel,
+              content_preview: (d.content || "").slice(0, 100),
+            }))
+            .sort((a, b) => `${a.publication_date} ${a.slot}`.localeCompare(`${b.publication_date} ${b.slot}`));
+
+          if (scheduled.length) {
+            localStorage.setItem(`smm_calendar_${selectedClientId}`, JSON.stringify(scheduled));
+          }
+
+          const cached = localStorage.getItem(`smm_calendar_${selectedClientId}`);
+          const items = scheduled.length ? scheduled : (cached ? JSON.parse(cached) : []);
+          if (!items.length) {
+            showHtml("schOut", `<span class="hint">Nessuna pianificazione trovata per questo cliente.</span>`);
+            return;
+          }
+          const rows = items.map(i => `<tr><td>${i.publication_date}</td><td>${i.channel}</td><td>${i.slot}</td><td>${i.content_preview || "-"}</td></tr>`).join("");
+          showHtml("schOut", `
+            <strong>Calendario pianificato (salvato):</strong> ${items.length} elementi<br/>
             <table style="width:100%;border-collapse:collapse;margin-top:8px;">
               <thead><tr><th>Data</th><th>Canale</th><th>Orario</th><th>Anteprima contenuto</th></tr></thead>
               <tbody>${rows}</tbody>
@@ -712,6 +758,13 @@
           : "http://127.0.0.1:8000";
         $("schStartDate").value = new Date().toISOString().slice(0, 10);
         loadAIStatus();
+        if (authToken) {
+          loadClients()
+            .then(loadConfig)
+            .then(loadDrafts)
+            .then(loadScheduledCalendar)
+            .catch(() => {});
+        }
       })();
     </script>
   </body>
