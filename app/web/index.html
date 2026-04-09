@@ -228,13 +228,14 @@
 
         <section class="card">
           <h3>9) Approvazione e run</h3>
-          <label>ID bozza</label>
-          <input id="draftIdAction" placeholder="Incolla ID bozza da approvare/rifiutare" />
+          <label>ID bozza (opzionale: compilato automaticamente dalla lista)</label>
+          <input id="draftIdAction" placeholder="Seleziona da lista in 'Crea bozza automazione'" />
           <div class="actions">
             <button onclick="approveDraft()">Approva</button>
             <button class="secondary" onclick="rejectDraft()">Rifiuta</button>
             <button class="ghost" onclick="runAutomation()">Esegui automazione ora</button>
           </div>
+          <p class="hint">Suggerimento: usa i pulsanti Approva/Rifiuta direttamente dalla lista bozze, senza copiare ID.</p>
           <div id="runOut" class="hint"></div>
         </section>
 
@@ -495,6 +496,9 @@
             `).join("")}
             `
           );
+          if ($("cntAutoDrafts").checked) {
+            await loadDrafts();
+          }
         } catch (e) { showErr("cntOut", e); }
       }
 
@@ -591,8 +595,24 @@
           showHtml("autoOut", `
             <strong>Bozze attive:</strong> ${drafts.length}<br/>
             <strong>Pubblicazioni storiche:</strong> ${published.length}<br/>
-            <small>Seleziona una bozza per approvare/rifiutare:</small>
-            <ul>${drafts.slice(0, 10).map(d => `<li><button class="ghost" onclick="document.getElementById('draftIdAction').value='${d.id}'">Usa</button> ${d.channel.toUpperCase()} - ${d.status} - ${d.content.slice(0,80)}...</li>`).join("")}</ul>
+            <small>Approva/Rifiuta dalla lista (nessun ID da inserire manualmente):</small>
+            <table style="width:100%;border-collapse:collapse;margin-top:8px;">
+              <thead><tr><th style="text-align:left;">Canale</th><th style="text-align:left;">Stato</th><th style="text-align:left;">Programmata</th><th style="text-align:left;">Contenuto</th><th style="text-align:left;">Azioni</th></tr></thead>
+              <tbody>
+                ${drafts.slice(0, 20).map(d => `
+                  <tr>
+                    <td>${d.channel.toUpperCase()}</td>
+                    <td>${d.status}</td>
+                    <td>${(d.scheduled_for || "").slice(0,16).replace("T"," ")}</td>
+                    <td>${(d.content || "").slice(0,90)}...</td>
+                    <td>
+                      <button class="ghost" onclick="approveDraftById('${d.id}')">Approva</button>
+                      <button class="secondary" onclick="rejectDraftById('${d.id}')">Rifiuta</button>
+                    </td>
+                  </tr>
+                `).join("")}
+              </tbody>
+            </table>
           `);
         } catch (e) { showErr("autoOut", e); }
       }
@@ -636,12 +656,28 @@
       }
 
       async function approveDraft() {
-        try { show("runOut", await api(`/api/v1/automation/drafts/${$("draftIdAction").value}/approve`, "POST")); }
+        try {
+          if (!$("draftIdAction").value) throw new Error("Seleziona una bozza dalla lista prima di approvare.");
+          show("runOut", await api(`/api/v1/automation/drafts/${$("draftIdAction").value}/approve`, "POST"));
+          await loadDrafts();
+        }
         catch (e) { showErr("runOut", e); }
       }
       async function rejectDraft() {
-        try { show("runOut", await api(`/api/v1/automation/drafts/${$("draftIdAction").value}/reject`, "POST")); }
+        try {
+          if (!$("draftIdAction").value) throw new Error("Seleziona una bozza dalla lista prima di rifiutare.");
+          show("runOut", await api(`/api/v1/automation/drafts/${$("draftIdAction").value}/reject`, "POST"));
+          await loadDrafts();
+        }
         catch (e) { showErr("runOut", e); }
+      }
+      async function approveDraftById(id) {
+        $("draftIdAction").value = id;
+        await approveDraft();
+      }
+      async function rejectDraftById(id) {
+        $("draftIdAction").value = id;
+        await rejectDraft();
       }
       async function runAutomation() {
         try {
