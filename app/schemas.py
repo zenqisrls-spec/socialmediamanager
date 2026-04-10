@@ -205,6 +205,10 @@ class AutomationDraft(BaseModel):
     updated_at: str
 
 
+class DraftScheduleUpdateRequest(BaseModel):
+    scheduled_for: str | None = None
+
+
 class AutomationRunResponse(BaseModel):
     processed: int
     published: int

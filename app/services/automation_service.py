@@ -154,6 +154,29 @@ class AutomationService:
     def reject(self, draft_id: str) -> dict[str, Any] | None:
         return self._update_status(draft_id, "rejected")
 
+    def delete(self, draft_id: str) -> bool:
+        with self.db.connect() as conn:
+            row = conn.execute("SELECT id FROM drafts WHERE id=?", (draft_id,)).fetchone()
+            if not row:
+                return False
+            conn.execute("DELETE FROM drafts WHERE id=?", (draft_id,))
+            conn.commit()
+        return True
+
+    def update_schedule(self, draft_id: str, scheduled_for: str | None) -> dict[str, Any] | None:
+        with self.db.connect() as conn:
+            row = conn.execute("SELECT * FROM drafts WHERE id=?", (draft_id,)).fetchone()
+            if not row:
+                return None
+            value = scheduled_for or ""
+            conn.execute(
+                "UPDATE drafts SET scheduled_for=?, updated_at=? WHERE id=?",
+                (value, _now_iso(), draft_id),
+            )
+            conn.commit()
+            updated = conn.execute("SELECT * FROM drafts WHERE id=?", (draft_id,)).fetchone()
+        return dict(updated) if updated else None
+
     def run(self, *, require_human_approval: bool, autopublish_enabled: bool, cfg: dict[str, Any]) -> dict[str, int]:
         processed = 0
         published = 0

@@ -21,6 +21,7 @@ from app.schemas import (
     ContentWithDraftsResponse,
     AutomationDraft,
     AutomationDraftCreateRequest,
+    DraftScheduleUpdateRequest,
     AutomationRunResponse,
     DashboardSummary,
     AuditLogItem,
@@ -320,6 +321,28 @@ def reject_automation_draft(draft_id: str, user: dict = Depends(get_current_user
         raise HTTPException(status_code=404, detail="Draft non trovata")
     audit_service.log(user["username"], "reject_draft", f"Draft {draft_id} rifiutata")
     return AutomationDraft(**item)
+
+
+@app.put("/api/v1/automation/drafts/{draft_id}/schedule", response_model=AutomationDraft)
+def update_automation_draft_schedule(
+    draft_id: str, payload: DraftScheduleUpdateRequest, user: dict = Depends(get_current_user)
+) -> AutomationDraft:
+    require_roles(user, {"admin", "editor"})
+    item = automation_service.update_schedule(draft_id, payload.scheduled_for)
+    if not item:
+        raise HTTPException(status_code=404, detail="Draft non trovata")
+    audit_service.log(user["username"], "update_draft_schedule", f"Draft {draft_id} schedule updated")
+    return AutomationDraft(**item)
+
+
+@app.delete("/api/v1/automation/drafts/{draft_id}")
+def delete_automation_draft(draft_id: str, user: dict = Depends(get_current_user)) -> dict[str, bool]:
+    require_roles(user, {"admin", "editor"})
+    ok = automation_service.delete(draft_id)
+    if not ok:
+        raise HTTPException(status_code=404, detail="Draft non trovata")
+    audit_service.log(user["username"], "delete_draft", f"Draft {draft_id} deleted")
+    return {"deleted": True}
 
 
 @app.get("/api/v1/automation/published", response_model=list[PublishedItem])

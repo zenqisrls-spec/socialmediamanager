@@ -55,6 +55,10 @@
         border-radius: 10px; padding: 10px; overflow: auto; max-height: 260px;
       }
       .hint { color: var(--muted); font-size: .9rem; margin: 6px 0 0; }
+      .table-wrap { overflow-x: auto; margin-top: 8px; }
+      table { width: 100%; border-collapse: collapse; }
+      th, td { padding: 6px; text-align: left; vertical-align: top; border-bottom: 1px solid #e5e7eb; }
+      td.wrap { white-space: normal; word-break: break-word; max-width: 280px; }
     </style>
   </head>
   <body>
@@ -228,14 +232,13 @@
 
         <section class="card">
           <h3>9) Approvazione e run</h3>
-          <label>ID bozza (opzionale: compilato automaticamente dalla lista)</label>
-          <input id="draftIdAction" placeholder="Seleziona da lista in 'Crea bozza automazione'" />
           <div class="actions">
-            <button onclick="approveDraft()">Approva</button>
-            <button class="secondary" onclick="rejectDraft()">Rifiuta</button>
+            <button onclick="enableAutomation()">Attiva automazioni</button>
+            <button class="secondary" onclick="disableAutomation()">Disattiva automazioni</button>
             <button class="ghost" onclick="runAutomation()">Esegui automazione ora</button>
           </div>
-          <p class="hint">Suggerimento: usa i pulsanti Approva/Rifiuta direttamente dalla lista bozze, senza copiare ID.</p>
+          <p class="hint">Approva, rifiuta o elimina direttamente dalla lista. Nessun ID manuale richiesto.</p>
+          <div id="automationStatusOut" class="hint"></div>
           <div id="draftListOut" class="hint"></div>
           <div id="runOut" class="hint"></div>
         </section>
@@ -410,6 +413,11 @@
             Approvazione umana: <strong>${cfg.require_human_approval ? "Attiva" : "Disattiva"}</strong><br/>
             Autopubblicazione: <strong>${cfg.autopublish_enabled ? "Attiva" : "Disattiva"}</strong>
           `);
+          showHtml("automationStatusOut", `
+            <strong>Stato automazioni:</strong><br/>
+            Autopubblicazione: <strong>${cfg.autopublish_enabled ? "Attiva" : "Disattiva"}</strong><br/>
+            Approvazione umana: <strong>${cfg.require_human_approval ? "Attiva" : "Disattiva"}</strong>
+          `);
         } catch (e) { showErr("cfgOut", e); }
       }
 
@@ -417,6 +425,17 @@
         await saveClient();
         showHtml("cfgOut", `<span class="ok">Configurazione cliente salvata con successo.</span>`);
         await loadAIStatus();
+        await loadConfig();
+      }
+
+      async function enableAutomation() {
+        $("cfgAutopublish").checked = true;
+        await saveConfig();
+      }
+
+      async function disableAutomation() {
+        $("cfgAutopublish").checked = false;
+        await saveConfig();
       }
 
       async function loadAIStatus() {
@@ -604,27 +623,40 @@
           showHtml("draftListOut", `
             <strong>Bozze attive:</strong> ${drafts.length}<br/>
             <strong>Pubblicazioni storiche:</strong> ${published.length}<br/>
-            <small>Approva/Rifiuta dalla lista (nessun ID da inserire manualmente):</small>
-            <table style="width:100%;border-collapse:collapse;margin-top:8px;">
-              <thead><tr><th style="text-align:left;">Canale</th><th style="text-align:left;">Stato</th><th style="text-align:left;">Programmata</th><th style="text-align:left;">Contenuto</th><th style="text-align:left;">Azioni</th></tr></thead>
+            <small>Approva / rifiuta / elimina e aggiorna la data direttamente dalla tabella:</small>
+            <div class="table-wrap"><table>
+              <thead><tr><th>Canale</th><th>Stato</th><th>Programmata</th><th>Contenuto</th><th>Azioni</th></tr></thead>
               <tbody>
                 ${drafts.slice(0, 20).map(d => `
                   <tr>
                     <td>${d.channel.toUpperCase()}</td>
                     <td>${d.status}</td>
-                    <td>${(d.scheduled_for || "").slice(0,16).replace("T"," ")}</td>
-                    <td>${(d.content || "").slice(0,90)}...</td>
+                    <td>
+                      <input type="datetime-local" value="${toDateTimeLocalValue(d.scheduled_for)}" onchange="updateDraftSchedule('${d.id}', this.value)" />
+                      <button class="ghost" onclick="clearDraftSchedule('${d.id}')">Annulla data</button>
+                    </td>
+                    <td class="wrap">${(d.content || "").slice(0,180)}...</td>
                     <td>
                       <button class="ghost" onclick="approveDraftById('${d.id}')">Approva</button>
                       <button class="secondary" onclick="rejectDraftById('${d.id}')">Rifiuta</button>
+                      <button class="secondary" onclick="deleteDraftById('${d.id}')">Elimina</button>
                     </td>
                   </tr>
                 `).join("")}
               </tbody>
-            </table>
+            </table></div>
           `);
           showHtml("autoOut", `<span class="ok">Bozze aggiornate.</span>`);
         } catch (e) { showErr("autoOut", e); }
+      }
+
+      function toDateTimeLocalValue(isoText) {
+        if (!isoText) return "";
+        const clean = isoText.replace("Z", "+00:00");
+        const d = new Date(clean);
+        if (Number.isNaN(d.getTime())) return "";
+        const pad = (n) => `${n}`.padStart(2, "0");
+        return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
       }
 
       async function scheduleSelectedDrafts() {
@@ -661,6 +693,7 @@
             .map(d => ({
               publication_date: (d.scheduled_for || "").slice(0, 10),
               slot: (d.scheduled_for || "").slice(11, 16),
+              draft_id: d.id,
               channel: d.channel,
               content_preview: (d.content || "").slice(0, 100),
             }))
@@ -676,13 +709,22 @@
             showHtml("schOut", `<span class="hint">Nessuna pianificazione trovata per questo cliente.</span>`);
             return;
           }
-          const rows = items.map(i => `<tr><td>${i.publication_date}</td><td>${i.channel}</td><td>${i.slot}</td><td>${i.content_preview || "-"}</td></tr>`).join("");
+          const rows = items.map(i => `
+            <tr>
+              <td>${i.publication_date}</td>
+              <td>${i.channel}</td>
+              <td>${i.slot}</td>
+              <td class="wrap">${i.content_preview || "-"}</td>
+              <td>
+                ${i.draft_id ? `<button class="ghost" onclick="clearDraftSchedule('${i.draft_id}')">Rimuovi dal calendario</button>` : "-"}
+              </td>
+            </tr>`).join("");
           showHtml("schOut", `
             <strong>Calendario pianificato (salvato):</strong> ${items.length} elementi<br/>
-            <table style="width:100%;border-collapse:collapse;margin-top:8px;">
-              <thead><tr><th>Data</th><th>Canale</th><th>Orario</th><th>Anteprima contenuto</th></tr></thead>
+            <div class="table-wrap"><table>
+              <thead><tr><th>Data</th><th>Canale</th><th>Orario</th><th>Anteprima contenuto</th><th>Azioni</th></tr></thead>
               <tbody>${rows}</tbody>
-            </table>
+            </table></div>
           `);
         } catch (e) { showErr("schOut", e); }
       }
@@ -701,29 +743,40 @@
         } catch (e) { showErr("schOut", e); }
       }
 
-      async function approveDraft() {
-        try {
-          if (!$("draftIdAction").value) throw new Error("Seleziona una bozza dalla lista prima di approvare.");
-          show("runOut", await api(`/api/v1/automation/drafts/${$("draftIdAction").value}/approve`, "POST"));
-          await loadDrafts();
-        }
-        catch (e) { showErr("runOut", e); }
-      }
-      async function rejectDraft() {
-        try {
-          if (!$("draftIdAction").value) throw new Error("Seleziona una bozza dalla lista prima di rifiutare.");
-          show("runOut", await api(`/api/v1/automation/drafts/${$("draftIdAction").value}/reject`, "POST"));
-          await loadDrafts();
-        }
-        catch (e) { showErr("runOut", e); }
-      }
       async function approveDraftById(id) {
-        $("draftIdAction").value = id;
-        await approveDraft();
+        try {
+          show("runOut", await api(`/api/v1/automation/drafts/${id}/approve`, "POST"));
+          await loadDrafts();
+          await loadScheduledCalendar();
+        } catch (e) { showErr("runOut", e); }
       }
       async function rejectDraftById(id) {
-        $("draftIdAction").value = id;
-        await rejectDraft();
+        try {
+          show("runOut", await api(`/api/v1/automation/drafts/${id}/reject`, "POST"));
+          await loadDrafts();
+          await loadScheduledCalendar();
+        } catch (e) { showErr("runOut", e); }
+      }
+      async function deleteDraftById(id) {
+        try {
+          show("runOut", await api(`/api/v1/automation/drafts/${id}`, "DELETE"));
+          await loadDrafts();
+          await loadScheduledCalendar();
+        } catch (e) { showErr("runOut", e); }
+      }
+      async function updateDraftSchedule(id, datetimeLocal) {
+        try {
+          const scheduled_for = datetimeLocal ? `${datetimeLocal}:00+00:00` : null;
+          await api(`/api/v1/automation/drafts/${id}/schedule`, "PUT", { scheduled_for });
+          await loadScheduledCalendar();
+        } catch (e) { showErr("runOut", e); }
+      }
+      async function clearDraftSchedule(id) {
+        try {
+          await api(`/api/v1/automation/drafts/${id}/schedule`, "PUT", { scheduled_for: null });
+          await loadDrafts();
+          await loadScheduledCalendar();
+        } catch (e) { showErr("runOut", e); }
       }
       async function runAutomation() {
         try {
