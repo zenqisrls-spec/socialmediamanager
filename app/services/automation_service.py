@@ -1,0 +1,251 @@
+from __future__ import annotations
+
+import uuid
+from datetime import datetime, timedelta, timezone
+from typing import Any
+
+from app.services.db_service import DBService
+from app.services.client_service import ClientService
+from app.services.publisher_service import PublisherService
+
+
+def _now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+def _is_due(when: str) -> bool:
+    try:
+        dt = datetime.fromisoformat(when.replace("Z", "+00:00"))
+    except Exception:
+        return True
+    return dt <= datetime.now(timezone.utc)
+
+
+class AutomationService:
+    def __init__(self) -> None:
+        self.db = DBService()
+        self.publisher = PublisherService()
+        self.client_service = ClientService()
+
+    def create_draft(self, channel: str, content: str, scheduled_for: str | None, client_id: str = "") -> dict[str, Any]:
+        item = {
+            "id": str(uuid.uuid4()),
+            "client_id": client_id,
+            "channel": channel,
+            "content": content,
+            "status": "pending_approval",
+            "scheduled_for": scheduled_for or "",
+            "created_at": _now_iso(),
+            "updated_at": _now_iso(),
+        }
+        with self.db.connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO drafts(id, client_id, channel, content, status, scheduled_for, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    item["id"],
+                    item["client_id"],
+                    item["channel"],
+                    item["content"],
+                    item["status"],
+                    item["scheduled_for"],
+                    item["created_at"],
+                    item["updated_at"],
+                ),
+            )
+            conn.commit()
+        return item
+
+    def create_drafts_from_posts(
+        self, posts: list[dict[str, Any]], scheduled_for: str | None = None, client_id: str = ""
+    ) -> list[dict[str, Any]]:
+        created = []
+        for post in posts:
+            content = f"{post.get('hook', '')}\n\n{post.get('caption', '')}\n\nCTA: {post.get('call_to_action', '')}".strip()
+            created.append(
+                self.create_draft(
+                    channel=post.get("channel", "instagram"),
+                    content=content,
+                    scheduled_for=scheduled_for,
+                    client_id=client_id,
+                )
+            )
+        return created
+
+    def list_drafts(self, status: str | None = None, client_id: str | None = None) -> list[dict[str, Any]]:
+        with self.db.connect() as conn:
+            if status and client_id:
+                rows = conn.execute(
+                    "SELECT * FROM drafts WHERE status=? AND client_id=? ORDER BY created_at DESC",
+                    (status, client_id),
+                ).fetchall()
+            elif status:
+                rows = conn.execute("SELECT * FROM drafts WHERE status=? ORDER BY created_at DESC", (status,)).fetchall()
+            elif client_id:
+                rows = conn.execute("SELECT * FROM drafts WHERE client_id=? ORDER BY created_at DESC", (client_id,)).fetchall()
+            else:
+                rows = conn.execute("SELECT * FROM drafts ORDER BY created_at DESC").fetchall()
+        return [dict(r) for r in rows]
+
+    def schedule_drafts(
+        self,
+        *,
+        client_id: str,
+        draft_ids: list[str],
+        start_date_iso: str,
+        posts_per_week: int,
+    ) -> list[dict[str, Any]]:
+        eligible_statuses = {"pending_approval", "approved"}
+        with self.db.connect() as conn:
+            if draft_ids:
+                placeholders = ",".join("?" for _ in draft_ids)
+                rows = conn.execute(
+                    f"SELECT * FROM drafts WHERE client_id=? AND id IN ({placeholders}) ORDER BY created_at ASC",
+                    (client_id, *draft_ids),
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    "SELECT * FROM drafts WHERE client_id=? AND status IN ('pending_approval','approved') ORDER BY created_at ASC",
+                    (client_id,),
+                ).fetchall()
+
+            updated: list[dict[str, Any]] = []
+            slots = ["09:00:00+00:00", "13:00:00+00:00", "18:30:00+00:00", "21:00:00+00:00"]
+            for idx, row in enumerate(rows):
+                item = dict(row)
+                if item.get("status") not in eligible_statuses:
+                    continue
+                day_offset = idx // posts_per_week * 7 + (idx % posts_per_week)
+                slot = slots[idx % len(slots)]
+                scheduled_for = f"{start_date_iso}T{slot}"
+                if day_offset:
+                    dt = datetime.fromisoformat(f"{start_date_iso}T00:00:00+00:00")
+                    scheduled_for = (dt.replace(hour=0, minute=0, second=0) + timedelta(days=day_offset)).strftime("%Y-%m-%dT") + slot
+
+                conn.execute(
+                    "UPDATE drafts SET scheduled_for=?, updated_at=? WHERE id=?",
+                    (scheduled_for, _now_iso(), item["id"]),
+                )
+                item["scheduled_for"] = scheduled_for
+                updated.append(item)
+            conn.commit()
+        return updated
+
+    def list_published(self, client_id: str | None = None) -> list[dict[str, Any]]:
+        with self.db.connect() as conn:
+            if client_id:
+                rows = conn.execute(
+                    """
+                    SELECT p.draft_id, p.channel, p.status, p.message, p.published_at
+                    FROM published p
+                    JOIN drafts d ON d.id = p.draft_id
+                    WHERE d.client_id=?
+                    ORDER BY p.id DESC
+                    """,
+                    (client_id,),
+                ).fetchall()
+            else:
+                rows = conn.execute("SELECT draft_id, channel, status, message, published_at FROM published ORDER BY id DESC").fetchall()
+        return [dict(r) for r in rows]
+
+    def _update_status(self, draft_id: str, status: str) -> dict[str, Any] | None:
+        with self.db.connect() as conn:
+            row = conn.execute("SELECT * FROM drafts WHERE id=?", (draft_id,)).fetchone()
+            if not row:
+                return None
+            conn.execute("UPDATE drafts SET status=?, updated_at=? WHERE id=?", (status, _now_iso(), draft_id))
+            conn.commit()
+            updated = conn.execute("SELECT * FROM drafts WHERE id=?", (draft_id,)).fetchone()
+        return dict(updated) if updated else None
+
+    def approve(self, draft_id: str) -> dict[str, Any] | None:
+        return self._update_status(draft_id, "approved")
+
+    def reject(self, draft_id: str) -> dict[str, Any] | None:
+        return self._update_status(draft_id, "rejected")
+
+    def delete(self, draft_id: str) -> bool:
+        with self.db.connect() as conn:
+            row = conn.execute("SELECT id FROM drafts WHERE id=?", (draft_id,)).fetchone()
+            if not row:
+                return False
+            conn.execute("DELETE FROM drafts WHERE id=?", (draft_id,))
+            conn.commit()
+        return True
+
+    def update_schedule(self, draft_id: str, scheduled_for: str | None) -> dict[str, Any] | None:
+        with self.db.connect() as conn:
+            row = conn.execute("SELECT * FROM drafts WHERE id=?", (draft_id,)).fetchone()
+            if not row:
+                return None
+            value = scheduled_for or ""
+            conn.execute(
+                "UPDATE drafts SET scheduled_for=?, updated_at=? WHERE id=?",
+                (value, _now_iso(), draft_id),
+            )
+            conn.commit()
+            updated = conn.execute("SELECT * FROM drafts WHERE id=?", (draft_id,)).fetchone()
+        return dict(updated) if updated else None
+
+    def run(self, *, require_human_approval: bool, autopublish_enabled: bool, cfg: dict[str, Any]) -> dict[str, int]:
+        processed = 0
+        published = 0
+        failed = 0
+        with self.db.connect() as conn:
+            rows = conn.execute("SELECT * FROM drafts ORDER BY created_at ASC").fetchall()
+            for row in rows:
+                item = dict(row)
+                if item["status"] in {"published", "rejected", "failed"}:
+                    continue
+                if require_human_approval and item["status"] != "approved":
+                    continue
+                if not require_human_approval and item["status"] == "pending_approval":
+                    conn.execute("UPDATE drafts SET status=?, updated_at=? WHERE id=?", ("approved", _now_iso(), item["id"]))
+                    item["status"] = "approved"
+                if not autopublish_enabled:
+                    continue
+                if not _is_due(item.get("scheduled_for", "")):
+                    continue
+
+                publish_cfg = cfg
+                if item.get("client_id"):
+                    client = self.client_service.get(item["client_id"])
+                    if client:
+                        publish_cfg = {**cfg, **client}
+                result = self.publisher.publish(item["channel"], item["content"], publish_cfg)
+                processed += 1
+                if result["status"] == "published":
+                    published += 1
+                else:
+                    failed += 1
+                new_status = "published" if result["status"] == "published" else "failed"
+                conn.execute("UPDATE drafts SET status=?, updated_at=? WHERE id=?", (new_status, _now_iso(), item["id"]))
+                conn.execute(
+                    "INSERT INTO published(draft_id, channel, status, message, published_at) VALUES (?, ?, ?, ?, ?)",
+                    (item["id"], item["channel"], result["status"], result["message"], _now_iso()),
+                )
+            conn.commit()
+        return {"processed": processed, "published": published, "failed": failed}
+
+    def summary(self, client_id: str | None = None) -> dict[str, Any]:
+        drafts = self.list_drafts(client_id=client_id)
+        published_items = self.list_published(client_id=client_id)
+
+        by_status: dict[str, int] = {}
+        by_channel: dict[str, int] = {}
+        for d in drafts:
+            by_status[d["status"]] = by_status.get(d["status"], 0) + 1
+            by_channel[d["channel"]] = by_channel.get(d["channel"], 0) + 1
+
+        published_ok = len([p for p in published_items if p["status"] == "published"])
+        published_failed = len([p for p in published_items if p["status"] == "failed"])
+        return {
+            "drafts_total": len(drafts),
+            "published_total": len(published_items),
+            "published_ok": published_ok,
+            "published_failed": published_failed,
+            "drafts_by_status": by_status,
+            "drafts_by_channel": by_channel,
+        }

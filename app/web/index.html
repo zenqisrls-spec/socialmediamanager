@@ -1,0 +1,965 @@
+<!doctype html>
+<html lang="it">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Social Media Manager Pro</title>
+    <style>
+      :root {
+        --bg: #f5f7fb;
+        --card: #ffffff;
+        --text: #1f2937;
+        --muted: #6b7280;
+        --primary: #2563eb;
+        --ok: #059669;
+        --err: #dc2626;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0; padding: 24px;
+        font-family: "Segoe UI", Arial, sans-serif;
+        background: var(--bg); color: var(--text);
+      }
+      .wrap { max-width: 1200px; margin: 0 auto; }
+      .hero {
+        background: linear-gradient(135deg, #1d4ed8, #2563eb);
+        color: white; border-radius: 16px; padding: 18px 20px; margin-bottom: 18px;
+      }
+      .hero h1 { margin: 0 0 6px; font-size: 1.5rem; }
+      .hero p { margin: 0; opacity: .95; }
+      .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; }
+      .card {
+        background: var(--card); border-radius: 14px; padding: 14px;
+        box-shadow: 0 4px 14px rgba(31,41,55,.08);
+      }
+      .card h3 { margin: 0 0 10px; font-size: 1.05rem; }
+      label { font-size: .9rem; color: var(--muted); display: block; margin-top: 8px; }
+      input, select, textarea {
+        width: 100%; border: 1px solid #d1d5db; border-radius: 10px; padding: 8px;
+        margin-top: 4px; font-size: .95rem; background: #fff;
+      }
+      textarea { min-height: 90px; resize: vertical; }
+      .row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+      .actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+      button {
+        border: none; border-radius: 10px; padding: 9px 12px;
+        background: var(--primary); color: #fff; cursor: pointer; font-weight: 600;
+      }
+      button.secondary { background: #4b5563; }
+      button.ghost { background: #e5e7eb; color: #111827; }
+      .status { font-size: .88rem; margin-top: 8px; }
+      .ok { color: var(--ok); }
+      .err { color: var(--err); }
+      pre {
+        background: #0f172a; color: #e2e8f0;
+        border-radius: 10px; padding: 10px; overflow: auto; max-height: 260px;
+      }
+      .hint { color: var(--muted); font-size: .9rem; margin: 6px 0 0; }
+      .table-wrap { overflow-x: auto; margin-top: 8px; }
+      table { width: 100%; border-collapse: collapse; }
+      th, td { padding: 6px; text-align: left; vertical-align: top; border-bottom: 1px solid #e5e7eb; }
+      td.wrap { white-space: normal; word-break: break-word; max-width: 280px; }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div class="hero">
+        <h1>Social Media Manager Pro</h1>
+        <p>Gestione multi-cliente: strategie, contenuti, campagne e automazioni in un unico flusso operativo.</p>
+      </div>
+
+      <div class="card" style="margin-bottom: 16px;">
+        <h3>1) Connessione e login</h3>
+        <label>URL applicazione</label>
+        <input id="apiBase" />
+        <div class="row" style="grid-template-columns: 1fr 1fr auto; margin-top:8px;">
+          <div><label>Utente</label><input id="loginUser" placeholder="admin / approver / editor" /></div>
+          <div><label>Password</label><input id="loginPass" type="password" placeholder="admin123 / approver123 / editor123" /></div>
+          <div style="display:flex; align-items:end;"><button onclick="login()">Accedi</button></div>
+        </div>
+        <div id="loginStatus" class="status"></div>
+        <div id="aiStatus" class="status"></div>
+      </div>
+
+      <div class="grid">
+        <section class="card">
+          <h3>Profilo Cliente (multi-account)</h3>
+          <label>Cliente selezionato</label>
+          <select id="clientSelect"></select>
+          <div class="actions">
+            <button class="secondary" onclick="loadClients()">Aggiorna clienti</button>
+            <button class="ghost" onclick="newClientForm()">Nuovo cliente</button>
+            <button onclick="saveClient()">Salva cliente</button>
+          </div>
+          <div id="clientOut" class="hint"></div>
+          <label>Nome centro</label>
+          <input id="ctxBrand" value="Brand Cliente" />
+          <label>Sito web</label>
+          <input id="ctxWebsite" value="https://example.com" />
+          <label>Settore</label>
+          <input id="ctxIndustry" value="Servizi" />
+          <label>Città / zona</label>
+          <input id="ctxCity" value="Italia" />
+          <label>Valore distintivo</label>
+          <textarea id="ctxValue">Proposta di valore unica del cliente</textarea>
+          <label>Note operative cliente</label>
+          <textarea id="ctxNotes"></textarea>
+          <p class="hint">Questi dati verranno usati per personalizzare strategie, post e campagne.</p>
+        </section>
+
+        <section class="card">
+          <h3>2) Configurazione generale</h3>
+          <label>OpenAI API Key (facoltativa)</label>
+          <input id="cfgApiKey" type="password" />
+          <label>Modello AI</label>
+          <input id="cfgModel" value="gpt-4.1-mini" />
+          <label><input id="cfgApproval" type="checkbox" checked /> Richiedi approvazione umana</label>
+          <label><input id="cfgAutopublish" type="checkbox" /> Abilita autopubblicazione</label>
+          <label><input id="cfgWhatsapp" type="checkbox" /> Abilita WhatsApp</label>
+          <p class="hint">Per pubblicazione reale compila anche i campi integrazioni.</p>
+          <div class="actions">
+            <button class="secondary" onclick="loadConfig()">Carica configurazione</button>
+            <button onclick="saveConfig()">Salva configurazione</button>
+          </div>
+          <div id="cfgOut" class="hint"></div>
+        </section>
+
+        <section class="card">
+          <h3>3) Integrazioni piattaforme</h3>
+          <label>Meta Access Token</label>
+          <input id="cfgMetaToken" type="password" />
+          <label>Meta Page ID</label>
+          <input id="cfgMetaPageId" />
+          <label>Meta Ad Account ID</label>
+          <input id="cfgMetaAdAccountId" placeholder="es: 1234567890 (senza act_)" />
+          <label>Google Ads Customer ID</label>
+          <input id="cfgGoogleCustomerId" placeholder="es: 123-456-7890" />
+          <label>Google Ads Developer Token</label>
+          <input id="cfgGoogleDevToken" type="password" />
+          <label>Google Ads OAuth Client ID</label>
+          <input id="cfgGoogleClientId" />
+          <label>Google Ads OAuth Client Secret</label>
+          <input id="cfgGoogleClientSecret" type="password" />
+          <label>Google Ads Refresh Token</label>
+          <input id="cfgGoogleRefreshToken" type="password" />
+          <label>WhatsApp Token</label>
+          <input id="cfgWaToken" type="password" />
+          <label>WhatsApp Phone Number ID</label>
+          <input id="cfgWaPhoneId" />
+          <label>Numero destinatario WhatsApp</label>
+          <input id="cfgWaTo" placeholder="es: 393331234567" />
+          <p class="hint">Questi dati vengono salvati quando premi “Salva configurazione”.</p>
+        </section>
+
+        <section class="card">
+          <h3>4) Genera strategia marketing</h3>
+          <label>Obiettivo principale</label>
+          <select id="strGoal">
+            <option value="awareness">Awareness (visibilità)</option>
+            <option value="lead_generation">Lead generation (contatti)</option>
+            <option value="retention">Retention (fidelizzazione)</option>
+          </select>
+          <label>Budget mensile (€)</label>
+          <input id="strBudget" type="number" value="1200" />
+          <label>Prompt extra strategia (obbligatorio)</label>
+          <textarea id="strPrompt" placeholder="Es: focalizzati su lead B2B premium, evita tono promozionale aggressivo"></textarea>
+          <div class="actions"><button onclick="generateStrategy()">Genera strategia</button></div>
+          <div id="strOut" class="hint"></div>
+        </section>
+
+        <section class="card">
+          <h3>5) Genera contenuti social</h3>
+          <label>Canali (separati da virgola)</label>
+          <input id="cntChannels" value="instagram,facebook" />
+          <label>Obiettivi (separati da virgola)</label>
+          <input id="cntGoals" value="awareness,lead_generation" />
+          <label>Post a settimana</label>
+          <input id="cntPosts" type="number" value="4" />
+          <label>Argomenti dei post (separati da virgola)</label>
+          <input id="cntTopics" placeholder="es: meditazione, sonno, respirazione" />
+          <label>Brief contenuti (obbligatorio)</label>
+          <textarea id="cntPrompt" placeholder="Es: target donne 30-50 in Toscana, tono premium ma umano, obiettivo prenotazione prova, evita frasi generiche"></textarea>
+          <label><input id="cntIncludeImages" type="checkbox" /> Genera immagini (più lento)</label>
+          <label><input id="cntAutoDrafts" type="checkbox" /> Crea automaticamente bozze dopo la generazione</label>
+          <div class="actions"><button onclick="generateContent()">Genera post</button></div>
+          <div id="cntOut" class="hint"></div>
+        </section>
+
+        <section class="card">
+          <h3>6) Genera campagne ADS</h3>
+          <label>Obiettivi (separati da virgola)</label>
+          <input id="adsGoals" value="lead_generation" />
+          <label>Budget mensile (€)</label>
+          <input id="adsBudget" type="number" value="1500" />
+          <label>Argomenti campagne (separati da virgola)</label>
+          <input id="adsTopics" placeholder="es: gestione stress, percorsi detox" />
+          <label>Brief ADS (obbligatorio)</label>
+          <textarea id="adsPrompt" placeholder="Es: crea varianti per prospecting e retargeting con taglio professionale"></textarea>
+          <label>Nome batch campagne</label>
+          <input id="adsBatchName" value="Batch campagne del giorno" />
+          <label>Note batch (opzionale)</label>
+          <input id="adsBatchNotes" />
+          <div class="actions">
+            <button onclick="generateAds()">Genera campagne</button>
+            <button class="secondary" onclick="saveGeneratedAdsBatch()">Salva batch</button>
+            <button class="ghost" onclick="loadCampaigns()">Storico campagne</button>
+            <button class="ghost" onclick="syncCampaignsToPlatform('meta_ads','draft')">Invia a Meta (bozza)</button>
+            <button class="ghost" onclick="syncCampaignsToPlatform('meta_ads','publish')">Pubblica su Meta</button>
+            <button class="ghost" onclick="syncCampaignsToPlatform('google_ads','draft')">Invia a Google (bozza)</button>
+          </div>
+          <div id="adsOut" class="hint"></div>
+        </section>
+
+        <section class="card">
+          <h3>7) Calendario schedulazione</h3>
+          <p class="hint">Qui pianifichi le bozze generate: selezionale nella sezione contenuti e poi assegnale al calendario.</p>
+          <label>Data inizio</label>
+          <input id="schStartDate" type="date" />
+          <label>Settimane</label>
+          <input id="schWeeks" type="number" value="4" />
+          <label>Canali (separati da virgola)</label>
+          <input id="schChannels" value="instagram,facebook" />
+          <label>Post a settimana</label>
+          <input id="schPostsPerWeek" type="number" value="4" />
+          <div class="actions">
+            <button onclick="scheduleSelectedDrafts()">Pianifica bozze selezionate</button>
+            <button class="secondary" onclick="buildSchedule()">Calendario guida</button>
+          </div>
+          <div id="schOut" class="hint"></div>
+        </section>
+
+        <section class="card">
+          <h3>8) Crea bozza automazione</h3>
+          <label>Canale</label>
+          <select id="autoChannel">
+            <option>instagram</option><option>facebook</option><option>whatsapp</option><option>tiktok</option>
+          </select>
+          <label>Contenuto</label>
+          <textarea id="autoContent">Post automatico del cliente del giorno.</textarea>
+          <label>Template testo da file (.txt/.md/.json)</label>
+          <input id="autoTemplateFile" type="file" accept=".txt,.md,.json,.csv" />
+          <label>Immagine da allegare (opzionale)</label>
+          <input id="autoImageFile" type="file" accept="image/*" />
+          <label>Data/Ora pubblicazione (ISO UTC, opzionale)</label>
+          <input id="autoWhen" placeholder="2026-03-25T10:00:00+00:00" />
+          <div class="actions">
+            <button class="ghost" onclick="loadDraftTemplateFromFile()">Importa template</button>
+            <button onclick="createDraft()">Crea bozza</button>
+            <button class="secondary" onclick="loadDrafts()">Aggiorna bozze</button>
+          </div>
+          <div id="autoOut" class="hint"></div>
+        </section>
+
+        <section class="card">
+          <h3>9) Approvazione e run</h3>
+          <div class="actions">
+            <button class="ghost" onclick="openApprovalConsole()">Apri console approvazioni</button>
+            <button onclick="enableAutomation()">Attiva automazioni</button>
+            <button class="secondary" onclick="disableAutomation()">Disattiva automazioni</button>
+            <button class="ghost" onclick="runAutomation()">Esegui automazione ora</button>
+          </div>
+          <label>Filtro stato bozze</label>
+          <select id="draftStatusFilter" onchange="loadDrafts()">
+            <option value="">Tutte</option>
+            <option value="pending_approval">In attesa approvazione</option>
+            <option value="approved">Approvate</option>
+            <option value="rejected">Rifiutate</option>
+            <option value="published">Pubblicate</option>
+            <option value="failed">Fallite</option>
+          </select>
+          <p class="hint">Approva, rifiuta o elimina direttamente dalla lista. Nessun ID manuale richiesto.</p>
+          <div id="automationStatusOut" class="hint"></div>
+          <div id="draftListOut" class="hint"></div>
+          <div id="runOut" class="hint"></div>
+        </section>
+
+        <section class="card">
+          <h3>10) Dashboard KPI</h3>
+          <div class="actions"><button class="secondary" onclick="loadDashboard()">Aggiorna KPI</button></div>
+          <div id="dashOut" class="hint"></div>
+        </section>
+      </div>
+    </div>
+
+    <div id="approvalModal" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:9999;padding:24px;">
+      <div style="background:#fff;max-width:1100px;height:90vh;margin:0 auto;border-radius:12px;padding:16px;display:flex;flex-direction:column;">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <h3 style="margin:0;">Console gestione approvazioni</h3>
+          <button class="secondary" onclick="closeApprovalConsole()">Chiudi</button>
+        </div>
+        <div class="hint">Vista estesa per schermi piccoli: approvazione/rifiuto/eliminazione e aggiornamento data.</div>
+        <div id="approvalModalBody" style="overflow:auto;margin-top:10px;"></div>
+      </div>
+    </div>
+
+    <script>
+      let authToken = localStorage.getItem("smm_token") || "";
+      let lastGeneratedCampaigns = [];
+      let selectedClientId = "";
+      let lastCreatedDraftIds = [];
+      const $ = (id) => document.getElementById(id);
+      const splitCsv = (v) => v.split(",").map(x => x.trim()).filter(Boolean);
+      const baseUrl = () => $("apiBase").value.replace(/\/$/, "");
+      const authHeaders = () => authToken ? { "Authorization": `Bearer ${authToken}` } : {};
+      const getContext = () => ({
+        brand_name: $("ctxBrand").value,
+        website: $("ctxWebsite").value,
+        industry: $("ctxIndustry").value,
+        city: $("ctxCity").value,
+        unique_value: $("ctxValue").value
+      });
+      const clientPayload = () => ({
+        name: $("ctxBrand").value,
+        website: $("ctxWebsite").value,
+        industry: $("ctxIndustry").value,
+        city: $("ctxCity").value,
+        unique_value: $("ctxValue").value,
+        notes: $("ctxNotes").value,
+        openai_api_key: $("cfgApiKey").value,
+        model_name: $("cfgModel").value,
+        require_human_approval: $("cfgApproval").checked,
+        autopublish_enabled: $("cfgAutopublish").checked,
+        whatsapp_enabled: $("cfgWhatsapp").checked,
+        meta_access_token: $("cfgMetaToken").value,
+        meta_page_id: $("cfgMetaPageId").value,
+        meta_ad_account_id: $("cfgMetaAdAccountId").value,
+        whatsapp_token: $("cfgWaToken").value,
+        whatsapp_phone_number_id: $("cfgWaPhoneId").value,
+        whatsapp_to: $("cfgWaTo").value,
+        google_ads_customer_id: $("cfgGoogleCustomerId").value,
+        google_ads_developer_token: $("cfgGoogleDevToken").value,
+        google_ads_refresh_token: $("cfgGoogleRefreshToken").value,
+        google_ads_client_id: $("cfgGoogleClientId").value,
+        google_ads_client_secret: $("cfgGoogleClientSecret").value
+      });
+
+      async function api(path, method = "GET", body = null) {
+        const headers = { ...authHeaders() };
+        if (body !== null) headers["Content-Type"] = "application/json";
+        const res = await fetch(`${baseUrl()}${path}`, {
+          method, headers, body: body !== null ? JSON.stringify(body) : undefined
+        });
+        const txt = await res.text();
+        let data;
+        try { data = txt ? JSON.parse(txt) : {}; } catch { data = { raw: txt }; }
+        if (!res.ok) {
+          if (res.status === 401) {
+            authToken = "";
+            localStorage.removeItem("smm_token");
+            $("loginStatus").innerHTML = `<span class="err">Sessione scaduta:</span> effettua nuovamente l'accesso.`;
+          }
+          throw new Error(`${res.status} - ${JSON.stringify(data)}`);
+        }
+        return data;
+      }
+
+      function show(outId, data) { $(outId).textContent = JSON.stringify(data, null, 2); }
+      function showErr(outId, e) { $(outId).textContent = `Errore: ${e}`; }
+      function showHtml(outId, html) { $(outId).innerHTML = html; }
+
+      async function login() {
+        $("loginStatus").textContent = "Accesso in corso...";
+        try {
+          const data = await api("/api/v1/auth/login", "POST", {
+            username: $("loginUser").value, password: $("loginPass").value
+          });
+          authToken = data.access_token;
+          localStorage.setItem("smm_token", authToken);
+          $("loginStatus").innerHTML = `<span class="ok">Accesso riuscito</span> (ruolo: ${data.role})`;
+          await loadClients();
+          await loadConfig();
+          await loadAIStatus();
+          await loadDashboard();
+          await loadDrafts();
+          await loadScheduledCalendar();
+        } catch (e) {
+          $("loginStatus").innerHTML = `<span class="err">Accesso fallito:</span> ${e}`;
+        }
+      }
+
+      function fillClientForm(c) {
+        $("ctxBrand").value = c.name || "";
+        $("ctxWebsite").value = c.website || "";
+        $("ctxIndustry").value = c.industry || "";
+        $("ctxCity").value = c.city || "";
+        $("ctxValue").value = c.unique_value || "";
+        $("ctxNotes").value = c.notes || "";
+        $("cfgApiKey").value = c.openai_api_key || "";
+        $("cfgModel").value = c.model_name || "gpt-4.1-mini";
+        $("cfgApproval").checked = !!c.require_human_approval;
+        $("cfgAutopublish").checked = !!c.autopublish_enabled;
+        $("cfgWhatsapp").checked = !!c.whatsapp_enabled;
+        $("cfgMetaToken").value = c.meta_access_token || "";
+        $("cfgMetaPageId").value = c.meta_page_id || "";
+        $("cfgMetaAdAccountId").value = c.meta_ad_account_id || "";
+        $("cfgWaToken").value = c.whatsapp_token || "";
+        $("cfgWaPhoneId").value = c.whatsapp_phone_number_id || "";
+        $("cfgWaTo").value = c.whatsapp_to || "";
+        $("cfgGoogleCustomerId").value = c.google_ads_customer_id || "";
+        $("cfgGoogleDevToken").value = c.google_ads_developer_token || "";
+        $("cfgGoogleRefreshToken").value = c.google_ads_refresh_token || "";
+        $("cfgGoogleClientId").value = c.google_ads_client_id || "";
+        $("cfgGoogleClientSecret").value = c.google_ads_client_secret || "";
+      }
+
+      function newClientForm() {
+        selectedClientId = "";
+        fillClientForm({ name: "", website: "", industry: "", city: "", unique_value: "", notes: "" });
+        $("clientOut").textContent = "Nuovo cliente: compila i campi e premi Salva cliente.";
+      }
+
+      async function loadClients() {
+        try {
+          const clients = await api("/api/v1/clients");
+          const sel = $("clientSelect");
+          sel.innerHTML = clients.length
+            ? clients.map(c => `<option value="${c.id}">${c.name} — ${c.city}</option>`).join("")
+            : `<option value="">Nessun cliente</option>`;
+          if (clients.length) {
+            selectedClientId = clients[0].id;
+            fillClientForm(clients[0]);
+            await loadDrafts();
+            await loadScheduledCalendar();
+          }
+          sel.onchange = async () => {
+            selectedClientId = sel.value;
+            if (!selectedClientId) return;
+            const c = await api(`/api/v1/clients/${selectedClientId}`);
+            fillClientForm(c);
+            await loadDrafts();
+            await loadScheduledCalendar();
+          };
+          $("clientOut").textContent = `Clienti caricati: ${clients.length}`;
+        } catch (e) { showErr("clientOut", e); }
+      }
+
+      async function saveClient() {
+        try {
+          const payload = clientPayload();
+          if (!payload.name.trim()) throw new Error("Nome cliente obbligatorio");
+          const path = selectedClientId ? `/api/v1/clients/${selectedClientId}` : "/api/v1/clients";
+          const method = selectedClientId ? "PUT" : "POST";
+          const data = await api(path, method, payload);
+          selectedClientId = data.id;
+          await loadClients();
+          $("clientOut").innerHTML = `<span class="ok">Cliente salvato</span>: ${data.name}`;
+        } catch (e) { showErr("clientOut", e); }
+      }
+
+      async function loadConfig() {
+        try {
+          if (!selectedClientId) throw new Error("Seleziona prima un cliente");
+          const cfg = await api(`/api/v1/clients/${selectedClientId}`);
+          $("cfgApiKey").value = cfg.openai_api_key || "";
+          $("cfgModel").value = cfg.model_name || "gpt-4.1-mini";
+          $("cfgApproval").checked = !!cfg.require_human_approval;
+          $("cfgAutopublish").checked = !!cfg.autopublish_enabled;
+          $("cfgWhatsapp").checked = !!cfg.whatsapp_enabled;
+          $("cfgMetaToken").value = cfg.meta_access_token || "";
+          $("cfgMetaPageId").value = cfg.meta_page_id || "";
+          $("cfgMetaAdAccountId").value = cfg.meta_ad_account_id || "";
+          $("cfgWaToken").value = cfg.whatsapp_token || "";
+          $("cfgWaPhoneId").value = cfg.whatsapp_phone_number_id || "";
+          $("cfgWaTo").value = cfg.whatsapp_to || "";
+          $("cfgGoogleCustomerId").value = cfg.google_ads_customer_id || "";
+          $("cfgGoogleDevToken").value = cfg.google_ads_developer_token || "";
+          $("cfgGoogleRefreshToken").value = cfg.google_ads_refresh_token || "";
+          $("cfgGoogleClientId").value = cfg.google_ads_client_id || "";
+          $("cfgGoogleClientSecret").value = cfg.google_ads_client_secret || "";
+          showHtml("cfgOut", `
+            <strong>Configurazione caricata.</strong><br/>
+            Modello AI: <strong>${cfg.model_name}</strong><br/>
+            Approvazione umana: <strong>${cfg.require_human_approval ? "Attiva" : "Disattiva"}</strong><br/>
+            Autopubblicazione: <strong>${cfg.autopublish_enabled ? "Attiva" : "Disattiva"}</strong>
+          `);
+          showHtml("automationStatusOut", `
+            <strong>Stato automazioni:</strong><br/>
+            Autopubblicazione: <strong>${cfg.autopublish_enabled ? "Attiva" : "Disattiva"}</strong><br/>
+            Approvazione umana: <strong>${cfg.require_human_approval ? "Attiva" : "Disattiva"}</strong>
+          `);
+        } catch (e) { showErr("cfgOut", e); }
+      }
+
+      async function saveConfig() {
+        await saveClient();
+        showHtml("cfgOut", `<span class="ok">Configurazione cliente salvata con successo.</span>`);
+        await loadAIStatus();
+        await loadConfig();
+      }
+
+      async function enableAutomation() {
+        $("cfgAutopublish").checked = true;
+        await saveConfig();
+      }
+
+      async function disableAutomation() {
+        $("cfgAutopublish").checked = false;
+        await saveConfig();
+      }
+
+      async function loadAIStatus() {
+        try {
+          const s = await api("/api/v1/ai/status");
+          const statusText = s.api_key_configured && s.openai_package_available
+            ? `<span class="ok">AI attiva</span>: i contenuti possono essere generati da OpenAI.`
+            : `<span class="err">AI fallback</span>: mancano API key o pacchetto openai.`;
+          $("aiStatus").innerHTML = statusText;
+        } catch (e) {
+          $("aiStatus").textContent = `Errore stato AI: ${e}`;
+        }
+      }
+
+      async function generateStrategy() {
+        try {
+          const payload = {
+            goals: [$("strGoal").value],
+            client_id: selectedClientId,
+            monthly_budget_eur: Number($("strBudget").value || 0),
+            prompt_instructions: $("strPrompt").value,
+            context: getContext()
+          };
+          if (!payload.prompt_instructions.trim()) throw new Error("Prompt strategia obbligatorio");
+          const data = await api("/api/v1/strategy/generate", "POST", payload);
+          showHtml("strOut", `
+            <strong>Posizionamento:</strong> ${data.strategic_positioning}<br/><br/>
+            <strong>Pilastri mensili:</strong><ul>${data.monthly_pillars.map(p => `<li>${p}</li>`).join("")}</ul>
+            <strong>KPI consigliati:</strong><ul>${data.kpis.map(k => `<li>${k}</li>`).join("")}</ul>
+            <strong>Funnel offerta:</strong><ul>${data.offer_funnel.map(f => `<li>${f}</li>`).join("")}</ul>
+          `);
+        } catch (e) { showErr("strOut", e); }
+      }
+
+      async function generateContent() {
+        try {
+          showHtml("cntOut", "Generazione contenuti in corso...");
+          const payload = {
+            goals: splitCsv($("cntGoals").value),
+            client_id: selectedClientId,
+            channels: splitCsv($("cntChannels").value),
+            posts_per_week: Number($("cntPosts").value || 4),
+            include_images: $("cntIncludeImages").checked,
+            topics: splitCsv($("cntTopics").value),
+            prompt_instructions: $("cntPrompt").value,
+            context: getContext()
+          };
+          if (!payload.prompt_instructions.trim()) throw new Error("Prompt contenuti obbligatorio");
+          const path = $("cntAutoDrafts").checked
+            ? "/api/v1/content/generate-posts-and-drafts"
+            : "/api/v1/content/generate-posts";
+          const data = await api(path, "POST", payload);
+          if (!data.post_ideas || !data.post_ideas.length) {
+            showHtml("cntOut", `<span class="err">Nessun post generato. Verifica prompt/parametri e riprova.</span>`);
+            return;
+          }
+          lastCreatedDraftIds = (data.created_drafts || []).map((d) => d.id);
+          showHtml("cntOut",
+            `
+            ${$("cntAutoDrafts").checked ? `<div><strong>Bozze create automaticamente:</strong> ${(data.created_drafts || []).length}</div><br/>` : ""}
+            ${$("cntAutoDrafts").checked ? `
+              <div style="margin-bottom:10px;">
+                <strong>Seleziona le bozze da pianificare:</strong><br/>
+                ${(data.created_drafts || []).map((d, i) => `
+                  <label style="display:block;color:#111827;margin-top:4px;">
+                    <input type="checkbox" class="draftCheck" value="${d.id}" checked />
+                    Bozza ${i + 1} (${d.channel}) — ID ${d.id.slice(0, 8)}...
+                  </label>
+                `).join("")}
+                <button class="ghost" style="margin-top:8px;" onclick="scheduleSelectedDrafts()">Pianifica nel calendario</button>
+              </div>
+            ` : ""}
+            ${(data.post_ideas || []).map((p, i) => `
+              <div style="background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:8px;margin-bottom:8px;">
+                <strong>Post ${i + 1} — ${p.channel.toUpperCase()} (${p.content_type})</strong><br/>
+                <em>Obiettivo:</em> ${p.objective}<br/>
+                ${p.image_url ? `<br/><img src="${p.image_url}" alt="anteprima" style="max-width:220px;border-radius:6px;margin-top:6px;" />` : ""}
+                <br/><br/><strong>Versione finale modificabile:</strong>
+                <textarea style="margin-top:4px;min-height:140px;">${p.final_post_text || `${p.hook}\n\n${p.caption}\n\n${p.call_to_action}`}</textarea>
+                <div style="margin-top:6px;"><strong>Hashtag consigliati:</strong> ${(p.hashtags || []).join(" ") || "-"}</div>
+                <div style="margin-top:4px;"><small>Stile visivo: ${p.visual_style || "-"}</small></div>
+                ${p.image_prompt ? `<details style="margin-top:6px;"><summary>Dettaglio creativo immagine</summary><small>${p.image_prompt}</small></details>` : ""}
+              </div>
+            `).join("")}
+            `
+          );
+          if ($("cntAutoDrafts").checked) {
+            await loadDrafts();
+          }
+        } catch (e) { showErr("cntOut", e); }
+      }
+
+      async function generateAds() {
+        try {
+          showHtml("adsOut", "Generazione campagne in corso...");
+          const payload = {
+            goals: splitCsv($("adsGoals").value),
+            client_id: selectedClientId,
+            monthly_budget_eur: Number($("adsBudget").value || 0),
+            topics: splitCsv($("adsTopics").value),
+            prompt_instructions: $("adsPrompt").value,
+            context: getContext()
+          };
+          if (!payload.prompt_instructions.trim()) throw new Error("Prompt ADS obbligatorio");
+          const data = await api("/api/v1/ads/generate-campaigns", "POST", payload);
+          if (!data.campaigns || !data.campaigns.length) {
+            showHtml("adsOut", `<span class="err">Nessuna campagna generata. Verifica prompt/parametri e riprova.</span>`);
+            return;
+          }
+          lastGeneratedCampaigns = data.campaigns || [];
+          showHtml("adsOut",
+            data.campaigns.map((c, i) => `
+              <div style="background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:8px;margin-bottom:8px;">
+                <strong>Campagna ${i + 1} — ${c.platform}</strong><br/>
+                <em>Nome:</em> ${c.campaign_name}<br/>
+                <em>Obiettivo:</em> ${c.objective}<br/>
+                <em>Target:</em> ${c.target_audience}<br/>
+                <em>Budget giornaliero:</em> € ${c.daily_budget_eur}<br/>
+                <em>Messaggio:</em> ${c.ad_copy}<br/>
+                <em>KPI:</em> ${c.kpi_target}<br/>
+                <em>Brief immagine:</em> ${c.creative_brief_image || "-"}
+              </div>
+            `).join("")
+          );
+        } catch (e) { showErr("adsOut", e); }
+      }
+
+      async function saveGeneratedAdsBatch() {
+        try {
+          if (!lastGeneratedCampaigns.length) throw new Error("Prima genera almeno una campagna.");
+          const payload = {
+            name: $("adsBatchName").value || "Batch campagne",
+            client_id: selectedClientId,
+            notes: $("adsBatchNotes").value || "",
+            campaigns: lastGeneratedCampaigns
+          };
+          const data = await api("/api/v1/campaigns/batches", "POST", payload);
+          showHtml("adsOut", `<span class="ok">Batch salvato.</span><br/>ID batch: <strong>${data.batch_id}</strong><br/>Campagne: ${data.campaigns.length}`);
+        } catch (e) { showErr("adsOut", e); }
+      }
+
+      async function loadCampaigns() {
+        try {
+          const batches = await api(`/api/v1/campaigns/batches?client_id=${encodeURIComponent(selectedClientId)}`);
+          const campaigns = await api(`/api/v1/campaigns?client_id=${encodeURIComponent(selectedClientId)}`);
+          const rows = campaigns.slice(0, 20).map(c => `
+            <tr>
+              <td>${c.campaign_name}</td>
+              <td>${c.platform}</td>
+              <td>${c.status}</td>
+              <td>${c.objective}</td>
+              <td>€ ${c.daily_budget_eur}</td>
+            </tr>
+          `).join("");
+          showHtml("adsOut", `
+            <strong>Batch salvati:</strong> ${batches.length}<br/>
+            <strong>Campagne storicizzate:</strong> ${campaigns.length}<br/>
+            <table style="width:100%;border-collapse:collapse;margin-top:8px;">
+              <thead><tr><th style="text-align:left;">Nome</th><th style="text-align:left;">Piattaforma</th><th style="text-align:left;">Stato</th><th style="text-align:left;">Obiettivo</th><th style="text-align:left;">Budget</th></tr></thead>
+              <tbody>${rows}</tbody>
+            </table>
+          `);
+        } catch (e) { showErr("adsOut", e); }
+      }
+
+      async function syncCampaignsToPlatform(platform, mode) {
+        try {
+          const campaigns = await api(`/api/v1/campaigns?client_id=${encodeURIComponent(selectedClientId)}`);
+          if (!campaigns.length) throw new Error("Nessuna campagna disponibile da sincronizzare.");
+          const payload = {
+            client_id: selectedClientId,
+            campaign_ids: campaigns.map(c => c.id),
+            platform,
+            mode
+          };
+          const result = await api("/api/v1/campaigns/sync-platform", "POST", payload);
+          const rows = (result || []).map(r => `
+            <tr>
+              <td>${r.campaign_id.slice(0,8)}...</td>
+              <td>${r.platform}</td>
+              <td>${r.mode}</td>
+              <td>${r.success ? "OK" : "KO"}</td>
+              <td class="wrap">${r.message || "-"}</td>
+            </tr>
+          `).join("");
+          showHtml("adsOut", `
+            <strong>Sincronizzazione piattaforma completata:</strong> ${result.length} campagne<br/>
+            <div class="table-wrap"><table>
+              <thead><tr><th>ID</th><th>Piattaforma</th><th>Modalità</th><th>Esito</th><th>Messaggio</th></tr></thead>
+              <tbody>${rows}</tbody>
+            </table></div>
+          `);
+        } catch (e) { showErr("adsOut", e); }
+      }
+
+      async function createDraft() {
+        try {
+          const imageData = await readImageAsDataUrl();
+          const composed = imageData
+            ? `${$("autoContent").value}\n\n[ALLEGATO_IMMAGINE]\n${imageData}`
+            : $("autoContent").value;
+          const payload = {
+            client_id: selectedClientId,
+            channel: $("autoChannel").value,
+            content: composed,
+            scheduled_for: $("autoWhen").value || null
+          };
+          show("autoOut", await api("/api/v1/automation/drafts", "POST", payload));
+          await loadDrafts();
+          await loadScheduledCalendar();
+        } catch (e) { showErr("autoOut", e); }
+      }
+
+      async function loadDraftTemplateFromFile() {
+        try {
+          const f = $("autoTemplateFile").files?.[0];
+          if (!f) throw new Error("Seleziona prima un file template.");
+          const text = await f.text();
+          $("autoContent").value = text.slice(0, 12000);
+          showHtml("autoOut", `<span class="ok">Template importato da ${f.name}.</span>`);
+        } catch (e) { showErr("autoOut", e); }
+      }
+
+      async function readImageAsDataUrl() {
+        const f = $("autoImageFile").files?.[0];
+        if (!f) return "";
+        return await new Promise((resolve, reject) => {
+          const r = new FileReader();
+          r.onload = () => resolve(String(r.result || ""));
+          r.onerror = reject;
+          r.readAsDataURL(f);
+        });
+      }
+
+      async function loadDrafts() {
+        try {
+          const status = $("draftStatusFilter").value;
+          const query = `client_id=${encodeURIComponent(selectedClientId)}${status ? `&status=${encodeURIComponent(status)}` : ""}`;
+          const drafts = await api(`/api/v1/automation/drafts?${query}`);
+          const published = await api(`/api/v1/automation/published?client_id=${encodeURIComponent(selectedClientId)}`);
+          lastCreatedDraftIds = drafts.map(d => d.id);
+          const tableHtml = `
+            <strong>Bozze attive:</strong> ${drafts.length}<br/>
+            <strong>Pubblicazioni storiche:</strong> ${published.length}<br/>
+            <small>Approva / rifiuta / elimina e aggiorna la data direttamente dalla tabella:</small>
+            <div class="table-wrap"><table>
+              <thead><tr><th>Canale</th><th>Stato</th><th>Programmata</th><th>Contenuto</th><th>Azioni</th></tr></thead>
+              <tbody>
+                ${drafts.map(d => `
+                  <tr>
+                    <td>${d.channel.toUpperCase()}</td>
+                    <td>${d.status}</td>
+                    <td>
+                      <input type="datetime-local" value="${toDateTimeLocalValue(d.scheduled_for)}" onchange="updateDraftSchedule('${d.id}', this.value)" />
+                      <button class="ghost" onclick="clearDraftSchedule('${d.id}')">Annulla data</button>
+                    </td>
+                    <td class="wrap">${(d.content || "").slice(0,180)}...</td>
+                    <td>
+                      <button class="ghost" onclick="approveDraftById('${d.id}')">Approva</button>
+                      <button class="secondary" onclick="rejectDraftById('${d.id}')">Rifiuta</button>
+                      <button class="secondary" onclick="deleteDraftById('${d.id}')">Elimina</button>
+                    </td>
+                  </tr>
+                `).join("")}
+              </tbody>
+            </table></div>
+          `;
+          showHtml("draftListOut", tableHtml);
+          if ($("approvalModal").style.display === "block") {
+            showHtml("approvalModalBody", tableHtml);
+          }
+          showHtml("autoOut", `<span class="ok">Bozze aggiornate.</span>`);
+        } catch (e) { showErr("autoOut", e); }
+      }
+
+      function toDateTimeLocalValue(isoText) {
+        if (!isoText) return "";
+        const clean = isoText.replace("Z", "+00:00");
+        const d = new Date(clean);
+        if (Number.isNaN(d.getTime())) return "";
+        const pad = (n) => `${n}`.padStart(2, "0");
+        return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+      }
+
+      async function scheduleSelectedDrafts() {
+        try {
+          const checked = Array.from(document.querySelectorAll(".draftCheck:checked")).map((el) => el.value);
+          const selected = checked.length ? checked : lastCreatedDraftIds;
+          if (!selectedClientId) throw new Error("Seleziona prima un cliente.");
+          if (!selected.length) throw new Error("Nessuna bozza selezionata da pianificare.");
+          const payload = {
+            client_id: selectedClientId,
+            draft_ids: selected,
+            start_date: $("schStartDate").value || new Date().toISOString().slice(0, 10),
+            posts_per_week: Number($("schPostsPerWeek").value || 4),
+          };
+          const data = await api("/api/v1/scheduler/assign-drafts", "POST", payload);
+          localStorage.setItem(`smm_calendar_${selectedClientId}`, JSON.stringify(data.items || []));
+          const rows = (data.items || []).map(i => `<tr><td>${i.publication_date}</td><td>${i.channel}</td><td>${i.slot}</td><td>${i.content_preview || "-"}</td></tr>`).join("");
+          showHtml("schOut", `
+            <strong>Bozze pianificate:</strong> ${data.items.length}<br/>
+            <table style="width:100%;border-collapse:collapse;margin-top:8px;">
+              <thead><tr><th>Data</th><th>Canale</th><th>Orario</th><th>Anteprima contenuto</th></tr></thead>
+              <tbody>${rows}</tbody>
+            </table>
+          `);
+        } catch (e) { showErr("schOut", e); }
+      }
+
+      async function loadScheduledCalendar() {
+        try {
+          if (!selectedClientId) return;
+          const drafts = await api(`/api/v1/automation/drafts?client_id=${encodeURIComponent(selectedClientId)}`);
+          const scheduled = drafts
+            .filter(d => d.scheduled_for && d.status !== "rejected")
+            .map(d => ({
+              publication_date: (d.scheduled_for || "").slice(0, 10),
+              slot: (d.scheduled_for || "").slice(11, 16),
+              draft_id: d.id,
+              channel: d.channel,
+              content_preview: (d.content || "").slice(0, 100),
+            }))
+            .sort((a, b) => `${a.publication_date} ${a.slot}`.localeCompare(`${b.publication_date} ${b.slot}`));
+
+          if (scheduled.length) {
+            localStorage.setItem(`smm_calendar_${selectedClientId}`, JSON.stringify(scheduled));
+          }
+
+          const cached = localStorage.getItem(`smm_calendar_${selectedClientId}`);
+          const items = scheduled.length ? scheduled : (cached ? JSON.parse(cached) : []);
+          if (!items.length) {
+            showHtml("schOut", `<span class="hint">Nessuna pianificazione trovata per questo cliente.</span>`);
+            return;
+          }
+          const rows = items.map(i => `
+            <tr>
+              <td>${i.publication_date}</td>
+              <td>${i.channel}</td>
+              <td>${i.slot}</td>
+              <td class="wrap">${i.content_preview || "-"}</td>
+              <td>
+                ${i.draft_id ? `<button class="ghost" onclick="clearDraftSchedule('${i.draft_id}')">Rimuovi dal calendario</button>` : "-"}
+              </td>
+            </tr>`).join("");
+          showHtml("schOut", `
+            <strong>Calendario pianificato (salvato):</strong> ${items.length} elementi<br/>
+            <div class="table-wrap"><table>
+              <thead><tr><th>Data</th><th>Canale</th><th>Orario</th><th>Anteprima contenuto</th><th>Azioni</th></tr></thead>
+              <tbody>${rows}</tbody>
+            </table></div>
+          `);
+        } catch (e) { showErr("schOut", e); }
+      }
+
+      async function buildSchedule() {
+        try {
+          const payload = {
+            start_date: $("schStartDate").value || new Date().toISOString().slice(0, 10),
+            weeks: Number($("schWeeks").value || 4),
+            channels: splitCsv($("schChannels").value),
+            posts_per_week: Number($("schPostsPerWeek").value || 4)
+          };
+          const data = await api("/api/v1/scheduler/build", "POST", payload);
+          const rows = (data.items || []).slice(0, 40).map(i => `<tr><td>${i.publication_date}</td><td>${i.channel}</td><td>${i.slot}</td><td>${i.content_theme}</td></tr>`).join("");
+          showHtml("schOut", `<table style="width:100%;border-collapse:collapse;"><thead><tr><th>Data</th><th>Canale</th><th>Orario</th><th>Tema</th></tr></thead><tbody>${rows}</tbody></table>`);
+        } catch (e) { showErr("schOut", e); }
+      }
+
+      async function approveDraftById(id) {
+        try {
+          show("runOut", await api(`/api/v1/automation/drafts/${id}/approve`, "POST"));
+          await loadDrafts();
+          await loadScheduledCalendar();
+        } catch (e) { showErr("runOut", e); }
+      }
+      async function rejectDraftById(id) {
+        try {
+          show("runOut", await api(`/api/v1/automation/drafts/${id}/reject`, "POST"));
+          await loadDrafts();
+          await loadScheduledCalendar();
+        } catch (e) { showErr("runOut", e); }
+      }
+      async function deleteDraftById(id) {
+        try {
+          show("runOut", await api(`/api/v1/automation/drafts/${id}`, "DELETE"));
+          await loadDrafts();
+          await loadScheduledCalendar();
+        } catch (e) { showErr("runOut", e); }
+      }
+      async function updateDraftSchedule(id, datetimeLocal) {
+        try {
+          const scheduled_for = datetimeLocal ? `${datetimeLocal}:00+00:00` : null;
+          await api(`/api/v1/automation/drafts/${id}/schedule`, "PUT", { scheduled_for });
+          await loadScheduledCalendar();
+        } catch (e) { showErr("runOut", e); }
+      }
+      async function clearDraftSchedule(id) {
+        try {
+          await api(`/api/v1/automation/drafts/${id}/schedule`, "PUT", { scheduled_for: null });
+          await loadDrafts();
+          await loadScheduledCalendar();
+        } catch (e) {
+          if (String(e).includes("404")) {
+            const cached = JSON.parse(localStorage.getItem(`smm_calendar_${selectedClientId}`) || "[]");
+            localStorage.setItem(
+              `smm_calendar_${selectedClientId}`,
+              JSON.stringify(cached.filter((x) => x.draft_id !== id)),
+            );
+            await loadDrafts();
+            await loadScheduledCalendar();
+            return;
+          }
+          showErr("runOut", e);
+        }
+      }
+
+      function openApprovalConsole() {
+        $("approvalModal").style.display = "block";
+        $("approvalModalBody").innerHTML = $("draftListOut").innerHTML || "<small>Nessuna bozza disponibile.</small>";
+      }
+
+      function closeApprovalConsole() {
+        $("approvalModal").style.display = "none";
+      }
+      async function runAutomation() {
+        try {
+          const result = await api("/api/v1/automation/run", "POST");
+          showHtml("runOut", `
+            <strong>Automazione eseguita.</strong><br/>
+            Processati: <strong>${result.processed}</strong><br/>
+            Pubblicati: <strong>${result.published}</strong><br/>
+            Falliti: <strong>${result.failed}</strong>
+          `);
+        }
+        catch (e) { showErr("runOut", e); }
+      }
+      async function loadDashboard() {
+        try {
+          const d = await api(`/api/v1/dashboard/summary?client_id=${encodeURIComponent(selectedClientId)}`);
+          showHtml("dashOut", `
+            <strong>Bozze totali:</strong> ${d.drafts_total}<br/>
+            <strong>Pubblicazioni totali:</strong> ${d.published_total}<br/>
+            <strong>Pubblicazioni riuscite:</strong> ${d.published_ok}<br/>
+            <strong>Pubblicazioni fallite:</strong> ${d.published_failed}<br/>
+            <small>Dettaglio stato:</small>
+            <pre>${JSON.stringify(d.drafts_by_status, null, 2)}</pre>
+          `);
+        }
+        catch (e) { showErr("dashOut", e); }
+      }
+
+      (function init() {
+        $("apiBase").value = window.location.protocol.startsWith("http")
+          ? window.location.origin
+          : "http://127.0.0.1:8000";
+        $("schStartDate").value = new Date().toISOString().slice(0, 10);
+        loadAIStatus();
+        if (authToken) {
+          loadClients()
+            .then(loadConfig)
+            .then(loadDrafts)
+            .then(loadScheduledCalendar)
+            .catch(() => {});
+        }
+      })();
+    </script>
+  </body>
+</html>
