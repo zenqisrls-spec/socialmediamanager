@@ -34,7 +34,7 @@ class AutomationService:
             "channel": channel,
             "content": content,
             "status": "pending_approval",
-            "scheduled_for": scheduled_for or _now_iso(),
+            "scheduled_for": scheduled_for or "",
             "created_at": _now_iso(),
             "updated_at": _now_iso(),
         }

@@ -221,9 +221,14 @@
           </select>
           <label>Contenuto</label>
           <textarea id="autoContent">Post automatico del cliente del giorno.</textarea>
+          <label>Template testo da file (.txt/.md/.json)</label>
+          <input id="autoTemplateFile" type="file" accept=".txt,.md,.json,.csv" />
+          <label>Immagine da allegare (opzionale)</label>
+          <input id="autoImageFile" type="file" accept="image/*" />
           <label>Data/Ora pubblicazione (ISO UTC, opzionale)</label>
           <input id="autoWhen" placeholder="2026-03-25T10:00:00+00:00" />
           <div class="actions">
+            <button class="ghost" onclick="loadDraftTemplateFromFile()">Importa template</button>
             <button onclick="createDraft()">Crea bozza</button>
             <button class="secondary" onclick="loadDrafts()">Aggiorna bozze</button>
           </div>
@@ -233,10 +238,20 @@
         <section class="card">
           <h3>9) Approvazione e run</h3>
           <div class="actions">
+            <button class="ghost" onclick="openApprovalConsole()">Apri console approvazioni</button>
             <button onclick="enableAutomation()">Attiva automazioni</button>
             <button class="secondary" onclick="disableAutomation()">Disattiva automazioni</button>
             <button class="ghost" onclick="runAutomation()">Esegui automazione ora</button>
           </div>
+          <label>Filtro stato bozze</label>
+          <select id="draftStatusFilter" onchange="loadDrafts()">
+            <option value="">Tutte</option>
+            <option value="pending_approval">In attesa approvazione</option>
+            <option value="approved">Approvate</option>
+            <option value="rejected">Rifiutate</option>
+            <option value="published">Pubblicate</option>
+            <option value="failed">Fallite</option>
+          </select>
           <p class="hint">Approva, rifiuta o elimina direttamente dalla lista. Nessun ID manuale richiesto.</p>
           <div id="automationStatusOut" class="hint"></div>
           <div id="draftListOut" class="hint"></div>
@@ -248,6 +263,17 @@
           <div class="actions"><button class="secondary" onclick="loadDashboard()">Aggiorna KPI</button></div>
           <div id="dashOut" class="hint"></div>
         </section>
+      </div>
+    </div>
+
+    <div id="approvalModal" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:9999;padding:24px;">
+      <div style="background:#fff;max-width:1100px;height:90vh;margin:0 auto;border-radius:12px;padding:16px;display:flex;flex-direction:column;">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <h3 style="margin:0;">Console gestione approvazioni</h3>
+          <button class="secondary" onclick="closeApprovalConsole()">Chiudi</button>
+        </div>
+        <div class="hint">Vista estesa per schermi piccoli: approvazione/rifiuto/eliminazione e aggiornamento data.</div>
+        <div id="approvalModalBody" style="overflow:auto;margin-top:10px;"></div>
       </div>
     </div>
 
@@ -603,10 +629,14 @@
 
       async function createDraft() {
         try {
+          const imageData = await readImageAsDataUrl();
+          const composed = imageData
+            ? `${$("autoContent").value}\n\n[ALLEGATO_IMMAGINE]\n${imageData}`
+            : $("autoContent").value;
           const payload = {
             client_id: selectedClientId,
             channel: $("autoChannel").value,
-            content: $("autoContent").value,
+            content: composed,
             scheduled_for: $("autoWhen").value || null
           };
           show("autoOut", await api("/api/v1/automation/drafts", "POST", payload));
@@ -615,19 +645,42 @@
         } catch (e) { showErr("autoOut", e); }
       }
 
+      async function loadDraftTemplateFromFile() {
+        try {
+          const f = $("autoTemplateFile").files?.[0];
+          if (!f) throw new Error("Seleziona prima un file template.");
+          const text = await f.text();
+          $("autoContent").value = text.slice(0, 12000);
+          showHtml("autoOut", `<span class="ok">Template importato da ${f.name}.</span>`);
+        } catch (e) { showErr("autoOut", e); }
+      }
+
+      async function readImageAsDataUrl() {
+        const f = $("autoImageFile").files?.[0];
+        if (!f) return "";
+        return await new Promise((resolve, reject) => {
+          const r = new FileReader();
+          r.onload = () => resolve(String(r.result || ""));
+          r.onerror = reject;
+          r.readAsDataURL(f);
+        });
+      }
+
       async function loadDrafts() {
         try {
-          const drafts = await api(`/api/v1/automation/drafts?client_id=${encodeURIComponent(selectedClientId)}`);
+          const status = $("draftStatusFilter").value;
+          const query = `client_id=${encodeURIComponent(selectedClientId)}${status ? `&status=${encodeURIComponent(status)}` : ""}`;
+          const drafts = await api(`/api/v1/automation/drafts?${query}`);
           const published = await api("/api/v1/automation/published");
           lastCreatedDraftIds = drafts.map(d => d.id);
-          showHtml("draftListOut", `
+          const tableHtml = `
             <strong>Bozze attive:</strong> ${drafts.length}<br/>
             <strong>Pubblicazioni storiche:</strong> ${published.length}<br/>
             <small>Approva / rifiuta / elimina e aggiorna la data direttamente dalla tabella:</small>
             <div class="table-wrap"><table>
               <thead><tr><th>Canale</th><th>Stato</th><th>Programmata</th><th>Contenuto</th><th>Azioni</th></tr></thead>
               <tbody>
-                ${drafts.slice(0, 20).map(d => `
+                ${drafts.map(d => `
                   <tr>
                     <td>${d.channel.toUpperCase()}</td>
                     <td>${d.status}</td>
@@ -645,7 +698,11 @@
                 `).join("")}
               </tbody>
             </table></div>
-          `);
+          `;
+          showHtml("draftListOut", tableHtml);
+          if ($("approvalModal").style.display === "block") {
+            showHtml("approvalModalBody", tableHtml);
+          }
           showHtml("autoOut", `<span class="ok">Bozze aggiornate.</span>`);
         } catch (e) { showErr("autoOut", e); }
       }
@@ -776,7 +833,28 @@
           await api(`/api/v1/automation/drafts/${id}/schedule`, "PUT", { scheduled_for: null });
           await loadDrafts();
           await loadScheduledCalendar();
-        } catch (e) { showErr("runOut", e); }
+        } catch (e) {
+          if (String(e).includes("404")) {
+            const cached = JSON.parse(localStorage.getItem(`smm_calendar_${selectedClientId}`) || "[]");
+            localStorage.setItem(
+              `smm_calendar_${selectedClientId}`,
+              JSON.stringify(cached.filter((x) => x.draft_id !== id)),
+            );
+            await loadDrafts();
+            await loadScheduledCalendar();
+            return;
+          }
+          showErr("runOut", e);
+        }
+      }
+
+      function openApprovalConsole() {
+        $("approvalModal").style.display = "block";
+        $("approvalModalBody").innerHTML = $("draftListOut").innerHTML || "<small>Nessuna bozza disponibile.</small>";
+      }
+
+      function closeApprovalConsole() {
+        $("approvalModal").style.display = "none";
       }
       async function runAutomation() {
         try {
