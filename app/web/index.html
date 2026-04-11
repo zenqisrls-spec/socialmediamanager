@@ -130,6 +130,18 @@
           <input id="cfgMetaToken" type="password" />
           <label>Meta Page ID</label>
           <input id="cfgMetaPageId" />
+          <label>Meta Ad Account ID</label>
+          <input id="cfgMetaAdAccountId" placeholder="es: 1234567890 (senza act_)" />
+          <label>Google Ads Customer ID</label>
+          <input id="cfgGoogleCustomerId" placeholder="es: 123-456-7890" />
+          <label>Google Ads Developer Token</label>
+          <input id="cfgGoogleDevToken" type="password" />
+          <label>Google Ads OAuth Client ID</label>
+          <input id="cfgGoogleClientId" />
+          <label>Google Ads OAuth Client Secret</label>
+          <input id="cfgGoogleClientSecret" type="password" />
+          <label>Google Ads Refresh Token</label>
+          <input id="cfgGoogleRefreshToken" type="password" />
           <label>WhatsApp Token</label>
           <input id="cfgWaToken" type="password" />
           <label>WhatsApp Phone Number ID</label>
@@ -191,6 +203,9 @@
             <button onclick="generateAds()">Genera campagne</button>
             <button class="secondary" onclick="saveGeneratedAdsBatch()">Salva batch</button>
             <button class="ghost" onclick="loadCampaigns()">Storico campagne</button>
+            <button class="ghost" onclick="syncCampaignsToPlatform('meta_ads','draft')">Invia a Meta (bozza)</button>
+            <button class="ghost" onclick="syncCampaignsToPlatform('meta_ads','publish')">Pubblica su Meta</button>
+            <button class="ghost" onclick="syncCampaignsToPlatform('google_ads','draft')">Invia a Google (bozza)</button>
           </div>
           <div id="adsOut" class="hint"></div>
         </section>
@@ -307,9 +322,15 @@
         whatsapp_enabled: $("cfgWhatsapp").checked,
         meta_access_token: $("cfgMetaToken").value,
         meta_page_id: $("cfgMetaPageId").value,
+        meta_ad_account_id: $("cfgMetaAdAccountId").value,
         whatsapp_token: $("cfgWaToken").value,
         whatsapp_phone_number_id: $("cfgWaPhoneId").value,
-        whatsapp_to: $("cfgWaTo").value
+        whatsapp_to: $("cfgWaTo").value,
+        google_ads_customer_id: $("cfgGoogleCustomerId").value,
+        google_ads_developer_token: $("cfgGoogleDevToken").value,
+        google_ads_refresh_token: $("cfgGoogleRefreshToken").value,
+        google_ads_client_id: $("cfgGoogleClientId").value,
+        google_ads_client_secret: $("cfgGoogleClientSecret").value
       });
 
       async function api(path, method = "GET", body = null) {
@@ -370,9 +391,15 @@
         $("cfgWhatsapp").checked = !!c.whatsapp_enabled;
         $("cfgMetaToken").value = c.meta_access_token || "";
         $("cfgMetaPageId").value = c.meta_page_id || "";
+        $("cfgMetaAdAccountId").value = c.meta_ad_account_id || "";
         $("cfgWaToken").value = c.whatsapp_token || "";
         $("cfgWaPhoneId").value = c.whatsapp_phone_number_id || "";
         $("cfgWaTo").value = c.whatsapp_to || "";
+        $("cfgGoogleCustomerId").value = c.google_ads_customer_id || "";
+        $("cfgGoogleDevToken").value = c.google_ads_developer_token || "";
+        $("cfgGoogleRefreshToken").value = c.google_ads_refresh_token || "";
+        $("cfgGoogleClientId").value = c.google_ads_client_id || "";
+        $("cfgGoogleClientSecret").value = c.google_ads_client_secret || "";
       }
 
       function newClientForm() {
@@ -430,9 +457,15 @@
           $("cfgWhatsapp").checked = !!cfg.whatsapp_enabled;
           $("cfgMetaToken").value = cfg.meta_access_token || "";
           $("cfgMetaPageId").value = cfg.meta_page_id || "";
+          $("cfgMetaAdAccountId").value = cfg.meta_ad_account_id || "";
           $("cfgWaToken").value = cfg.whatsapp_token || "";
           $("cfgWaPhoneId").value = cfg.whatsapp_phone_number_id || "";
           $("cfgWaTo").value = cfg.whatsapp_to || "";
+          $("cfgGoogleCustomerId").value = cfg.google_ads_customer_id || "";
+          $("cfgGoogleDevToken").value = cfg.google_ads_developer_token || "";
+          $("cfgGoogleRefreshToken").value = cfg.google_ads_refresh_token || "";
+          $("cfgGoogleClientId").value = cfg.google_ads_client_id || "";
+          $("cfgGoogleClientSecret").value = cfg.google_ads_client_secret || "";
           showHtml("cfgOut", `
             <strong>Configurazione caricata.</strong><br/>
             Modello AI: <strong>${cfg.model_name}</strong><br/>
@@ -627,6 +660,36 @@
         } catch (e) { showErr("adsOut", e); }
       }
 
+      async function syncCampaignsToPlatform(platform, mode) {
+        try {
+          const campaigns = await api(`/api/v1/campaigns?client_id=${encodeURIComponent(selectedClientId)}`);
+          if (!campaigns.length) throw new Error("Nessuna campagna disponibile da sincronizzare.");
+          const payload = {
+            client_id: selectedClientId,
+            campaign_ids: campaigns.map(c => c.id),
+            platform,
+            mode
+          };
+          const result = await api("/api/v1/campaigns/sync-platform", "POST", payload);
+          const rows = (result || []).map(r => `
+            <tr>
+              <td>${r.campaign_id.slice(0,8)}...</td>
+              <td>${r.platform}</td>
+              <td>${r.mode}</td>
+              <td>${r.success ? "OK" : "KO"}</td>
+              <td class="wrap">${r.message || "-"}</td>
+            </tr>
+          `).join("");
+          showHtml("adsOut", `
+            <strong>Sincronizzazione piattaforma completata:</strong> ${result.length} campagne<br/>
+            <div class="table-wrap"><table>
+              <thead><tr><th>ID</th><th>Piattaforma</th><th>Modalità</th><th>Esito</th><th>Messaggio</th></tr></thead>
+              <tbody>${rows}</tbody>
+            </table></div>
+          `);
+        } catch (e) { showErr("adsOut", e); }
+      }
+
       async function createDraft() {
         try {
           const imageData = await readImageAsDataUrl();
@@ -671,7 +734,7 @@
           const status = $("draftStatusFilter").value;
           const query = `client_id=${encodeURIComponent(selectedClientId)}${status ? `&status=${encodeURIComponent(status)}` : ""}`;
           const drafts = await api(`/api/v1/automation/drafts?${query}`);
-          const published = await api("/api/v1/automation/published");
+          const published = await api(`/api/v1/automation/published?client_id=${encodeURIComponent(selectedClientId)}`);
           lastCreatedDraftIds = drafts.map(d => d.id);
           const tableHtml = `
             <strong>Bozze attive:</strong> ${drafts.length}<br/>
@@ -870,7 +933,7 @@
       }
       async function loadDashboard() {
         try {
-          const d = await api("/api/v1/dashboard/summary");
+          const d = await api(`/api/v1/dashboard/summary?client_id=${encodeURIComponent(selectedClientId)}`);
           showHtml("dashOut", `
             <strong>Bozze totali:</strong> ${d.drafts_total}<br/>
             <strong>Pubblicazioni totali:</strong> ${d.published_total}<br/>

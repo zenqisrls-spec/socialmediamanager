@@ -133,9 +133,21 @@ class AutomationService:
             conn.commit()
         return updated
 
-    def list_published(self) -> list[dict[str, Any]]:
+    def list_published(self, client_id: str | None = None) -> list[dict[str, Any]]:
         with self.db.connect() as conn:
-            rows = conn.execute("SELECT draft_id, channel, status, message, published_at FROM published ORDER BY id DESC").fetchall()
+            if client_id:
+                rows = conn.execute(
+                    """
+                    SELECT p.draft_id, p.channel, p.status, p.message, p.published_at
+                    FROM published p
+                    JOIN drafts d ON d.id = p.draft_id
+                    WHERE d.client_id=?
+                    ORDER BY p.id DESC
+                    """,
+                    (client_id,),
+                ).fetchall()
+            else:
+                rows = conn.execute("SELECT draft_id, channel, status, message, published_at FROM published ORDER BY id DESC").fetchall()
         return [dict(r) for r in rows]
 
     def _update_status(self, draft_id: str, status: str) -> dict[str, Any] | None:
@@ -217,9 +229,9 @@ class AutomationService:
             conn.commit()
         return {"processed": processed, "published": published, "failed": failed}
 
-    def summary(self) -> dict[str, Any]:
-        drafts = self.list_drafts()
-        published_items = self.list_published()
+    def summary(self, client_id: str | None = None) -> dict[str, Any]:
+        drafts = self.list_drafts(client_id=client_id)
+        published_items = self.list_published(client_id=client_id)
 
         by_status: dict[str, int] = {}
         by_channel: dict[str, int] = {}

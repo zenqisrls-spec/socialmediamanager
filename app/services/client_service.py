@@ -32,9 +32,15 @@ class ClientService:
             "whatsapp_enabled": bool(payload.get("whatsapp_enabled", False)),
             "meta_access_token": payload.get("meta_access_token", "").strip(),
             "meta_page_id": payload.get("meta_page_id", "").strip(),
+            "meta_ad_account_id": payload.get("meta_ad_account_id", "").strip(),
             "whatsapp_token": payload.get("whatsapp_token", "").strip(),
             "whatsapp_phone_number_id": payload.get("whatsapp_phone_number_id", "").strip(),
             "whatsapp_to": payload.get("whatsapp_to", "").strip(),
+            "google_ads_customer_id": payload.get("google_ads_customer_id", "").strip(),
+            "google_ads_developer_token": payload.get("google_ads_developer_token", "").strip(),
+            "google_ads_refresh_token": payload.get("google_ads_refresh_token", "").strip(),
+            "google_ads_client_id": payload.get("google_ads_client_id", "").strip(),
+            "google_ads_client_secret": payload.get("google_ads_client_secret", "").strip(),
             "created_at": now,
             "updated_at": now,
         }
@@ -44,9 +50,10 @@ class ClientService:
                 INSERT INTO clients(
                     id, name, website, industry, city, unique_value, notes,
                     openai_api_key, model_name, require_human_approval, autopublish_enabled, whatsapp_enabled,
-                    meta_access_token, meta_page_id, whatsapp_token, whatsapp_phone_number_id, whatsapp_to,
+                    meta_access_token, meta_page_id, meta_ad_account_id, whatsapp_token, whatsapp_phone_number_id, whatsapp_to,
+                    google_ads_customer_id, google_ads_developer_token, google_ads_refresh_token, google_ads_client_id, google_ads_client_secret,
                     created_at, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     item["id"],
@@ -63,9 +70,15 @@ class ClientService:
                     int(item["whatsapp_enabled"]),
                     item["meta_access_token"],
                     item["meta_page_id"],
+                    item["meta_ad_account_id"],
                     item["whatsapp_token"],
                     item["whatsapp_phone_number_id"],
                     item["whatsapp_to"],
+                    item["google_ads_customer_id"],
+                    item["google_ads_developer_token"],
+                    item["google_ads_refresh_token"],
+                    item["google_ads_client_id"],
+                    item["google_ads_client_secret"],
                     item["created_at"],
                     item["updated_at"],
                 ),
@@ -84,7 +97,8 @@ class ClientService:
                 UPDATE clients
                 SET name=?, website=?, industry=?, city=?, unique_value=?, notes=?,
                     openai_api_key=?, model_name=?, require_human_approval=?, autopublish_enabled=?, whatsapp_enabled=?,
-                    meta_access_token=?, meta_page_id=?, whatsapp_token=?, whatsapp_phone_number_id=?, whatsapp_to=?,
+                    meta_access_token=?, meta_page_id=?, meta_ad_account_id=?, whatsapp_token=?, whatsapp_phone_number_id=?, whatsapp_to=?,
+                    google_ads_customer_id=?, google_ads_developer_token=?, google_ads_refresh_token=?, google_ads_client_id=?, google_ads_client_secret=?,
                     updated_at=?
                 WHERE id=?
                 """,
@@ -102,9 +116,15 @@ class ClientService:
                     int(bool(merged.get("whatsapp_enabled", False))),
                     merged.get("meta_access_token", "").strip(),
                     merged.get("meta_page_id", "").strip(),
+                    merged.get("meta_ad_account_id", "").strip(),
                     merged.get("whatsapp_token", "").strip(),
                     merged.get("whatsapp_phone_number_id", "").strip(),
                     merged.get("whatsapp_to", "").strip(),
+                    merged.get("google_ads_customer_id", "").strip(),
+                    merged.get("google_ads_developer_token", "").strip(),
+                    merged.get("google_ads_refresh_token", "").strip(),
+                    merged.get("google_ads_client_id", "").strip(),
+                    merged.get("google_ads_client_secret", "").strip(),
                     merged["updated_at"],
                     client_id,
                 ),

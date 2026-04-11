@@ -41,6 +41,8 @@ from app.schemas import (
     CampaignBatch,
     CampaignRecord,
     CampaignStatusUpdateRequest,
+    CampaignPlatformSyncRequest,
+    CampaignPlatformSyncResult,
     ClientProfile,
     ClientProfileUpsert,
 )
@@ -51,6 +53,7 @@ from app.services.automation_service import AutomationService
 from app.services.campaign_service import CampaignService
 from app.services.marketing_service import MarketingService
 from app.services.client_service import ClientService
+from app.services.ads_sync_service import AdsSyncService
 
 app = FastAPI(
     title="ZenQi Social Media Manager API",
@@ -66,6 +69,7 @@ auth_service = AuthService()
 audit_service = AuditService()
 campaign_service = CampaignService()
 client_service = ClientService()
+ads_sync_service = AdsSyncService()
 WEB_INDEX = Path(__file__).resolve().parent / "web" / "index.html"
 automation_task: asyncio.Task | None = None
 
@@ -192,6 +196,21 @@ def update_campaign_status(
         raise HTTPException(status_code=404, detail="Campagna non trovata")
     audit_service.log(user["username"], "update_campaign_status", f"{campaign_id} -> {payload.status}")
     return CampaignRecord(**updated)
+
+
+@app.post("/api/v1/campaigns/sync-platform", response_model=list[CampaignPlatformSyncResult])
+def sync_campaigns_to_platform(
+    payload: CampaignPlatformSyncRequest, user: dict = Depends(get_current_user)
+) -> list[CampaignPlatformSyncResult]:
+    require_roles(user, {"admin", "editor"})
+    results = ads_sync_service.sync(
+        client_id=payload.client_id,
+        campaign_ids=payload.campaign_ids,
+        platform=payload.platform,
+        mode=payload.mode,
+    )
+    audit_service.log(user["username"], "sync_campaigns_platform", f"{payload.platform} ({payload.mode}) items={len(results)}")
+    return [CampaignPlatformSyncResult(**item) for item in results]
 
 
 @app.post("/api/v1/scheduler/build", response_model=ScheduleResponse)
@@ -346,8 +365,8 @@ def delete_automation_draft(draft_id: str, user: dict = Depends(get_current_user
 
 
 @app.get("/api/v1/automation/published", response_model=list[PublishedItem])
-def get_published_items() -> list[PublishedItem]:
-    return [PublishedItem(**item) for item in automation_service.list_published()]
+def get_published_items(client_id: str | None = None) -> list[PublishedItem]:
+    return [PublishedItem(**item) for item in automation_service.list_published(client_id=client_id)]
 
 
 @app.post("/api/v1/automation/run", response_model=AutomationRunResponse)
@@ -364,8 +383,8 @@ def run_automation_now(user: dict = Depends(get_current_user)) -> AutomationRunR
 
 
 @app.get("/api/v1/dashboard/summary", response_model=DashboardSummary)
-def dashboard_summary() -> DashboardSummary:
-    return DashboardSummary(**automation_service.summary())
+def dashboard_summary(client_id: str | None = None) -> DashboardSummary:
+    return DashboardSummary(**automation_service.summary(client_id=client_id))
 
 
 @app.get("/api/v1/audit/logs", response_model=list[AuditLogItem])

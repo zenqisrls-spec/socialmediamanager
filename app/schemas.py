@@ -137,6 +137,22 @@ class CampaignStatusUpdateRequest(BaseModel):
     status: CampaignStatus
 
 
+class CampaignPlatformSyncRequest(BaseModel):
+    client_id: str
+    campaign_ids: list[str] = Field(default_factory=list)
+    platform: Literal["meta_ads", "google_ads"]
+    mode: Literal["draft", "publish"] = "draft"
+
+
+class CampaignPlatformSyncResult(BaseModel):
+    campaign_id: str
+    platform: str
+    mode: str
+    success: bool
+    external_id: str = ""
+    message: str = ""
+
+
 class ScheduleRequest(BaseModel):
     start_date: date
     weeks: int = Field(default=4, ge=1, le=12)
@@ -269,9 +285,15 @@ class ClientProfile(BaseModel):
     whatsapp_enabled: bool = False
     meta_access_token: str = ""
     meta_page_id: str = ""
+    meta_ad_account_id: str = ""
     whatsapp_token: str = ""
     whatsapp_phone_number_id: str = ""
     whatsapp_to: str = ""
+    google_ads_customer_id: str = ""
+    google_ads_developer_token: str = ""
+    google_ads_refresh_token: str = ""
+    google_ads_client_id: str = ""
+    google_ads_client_secret: str = ""
     created_at: str
     updated_at: str
 
@@ -290,6 +312,12 @@ class ClientProfileUpsert(BaseModel):
     whatsapp_enabled: bool = False
     meta_access_token: str = ""
     meta_page_id: str = ""
+    meta_ad_account_id: str = ""
     whatsapp_token: str = ""
     whatsapp_phone_number_id: str = ""
     whatsapp_to: str = ""
+    google_ads_customer_id: str = ""
+    google_ads_developer_token: str = ""
+    google_ads_refresh_token: str = ""
+    google_ads_client_id: str = ""
+    google_ads_client_secret: str = ""

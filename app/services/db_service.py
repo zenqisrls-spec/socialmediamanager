@@ -96,9 +96,15 @@ class DBService:
                     whatsapp_enabled INTEGER NOT NULL DEFAULT 0,
                     meta_access_token TEXT NOT NULL DEFAULT '',
                     meta_page_id TEXT NOT NULL DEFAULT '',
+                    meta_ad_account_id TEXT NOT NULL DEFAULT '',
                     whatsapp_token TEXT NOT NULL DEFAULT '',
                     whatsapp_phone_number_id TEXT NOT NULL DEFAULT '',
                     whatsapp_to TEXT NOT NULL DEFAULT '',
+                    google_ads_customer_id TEXT NOT NULL DEFAULT '',
+                    google_ads_developer_token TEXT NOT NULL DEFAULT '',
+                    google_ads_refresh_token TEXT NOT NULL DEFAULT '',
+                    google_ads_client_id TEXT NOT NULL DEFAULT '',
+                    google_ads_client_secret TEXT NOT NULL DEFAULT '',
                     created_at TEXT NOT NULL,
                     updated_at TEXT NOT NULL
                 );
@@ -137,9 +143,15 @@ class DBService:
                 "whatsapp_enabled": "ALTER TABLE clients ADD COLUMN whatsapp_enabled INTEGER NOT NULL DEFAULT 0",
                 "meta_access_token": "ALTER TABLE clients ADD COLUMN meta_access_token TEXT NOT NULL DEFAULT ''",
                 "meta_page_id": "ALTER TABLE clients ADD COLUMN meta_page_id TEXT NOT NULL DEFAULT ''",
+                "meta_ad_account_id": "ALTER TABLE clients ADD COLUMN meta_ad_account_id TEXT NOT NULL DEFAULT ''",
                 "whatsapp_token": "ALTER TABLE clients ADD COLUMN whatsapp_token TEXT NOT NULL DEFAULT ''",
                 "whatsapp_phone_number_id": "ALTER TABLE clients ADD COLUMN whatsapp_phone_number_id TEXT NOT NULL DEFAULT ''",
                 "whatsapp_to": "ALTER TABLE clients ADD COLUMN whatsapp_to TEXT NOT NULL DEFAULT ''",
+                "google_ads_customer_id": "ALTER TABLE clients ADD COLUMN google_ads_customer_id TEXT NOT NULL DEFAULT ''",
+                "google_ads_developer_token": "ALTER TABLE clients ADD COLUMN google_ads_developer_token TEXT NOT NULL DEFAULT ''",
+                "google_ads_refresh_token": "ALTER TABLE clients ADD COLUMN google_ads_refresh_token TEXT NOT NULL DEFAULT ''",
+                "google_ads_client_id": "ALTER TABLE clients ADD COLUMN google_ads_client_id TEXT NOT NULL DEFAULT ''",
+                "google_ads_client_secret": "ALTER TABLE clients ADD COLUMN google_ads_client_secret TEXT NOT NULL DEFAULT ''",
             }
             for col, ddl in needed_client_columns.items():
                 if col not in client_columns:
